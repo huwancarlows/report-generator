@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../utils/supabaseClient"; // Import supabase client from utils
+import { supabase } from "../utils/supabaseClient";
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -13,9 +15,8 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-
     setLoading(true);
-    setError(""); // Reset error state
+    setError("");
 
     try {
       // Query the profiles table to check if the email and password match
@@ -31,23 +32,26 @@ export default function LoginPage() {
         return;
       }
 
-      // If login is successful, store user data in localStorage or a global state
-      localStorage.setItem("user", JSON.stringify(data));
+      // Update both localStorage and AuthContext
+      const userData = {
+        id: data.id,
+        email: data.email,
+        role: data.role
+      };
+      
+      login(userData);
 
-      // If login is successful, check the role and redirect accordingly
-      if (data) {
-        if (data.role === "admin") {
-          router.push("/admin");
-        } else if (data.role === "user") {
-          router.push("/user");
-        }
+      // Redirect based on role
+      if (data.role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/dashboard");
       }
     } catch (err) {
-      // Handle any other errors (e.g., network issues)
-      setError("An error occurred while connecting to the server. Please try again later.");
-      console.error("Error during login:", err);
+      setError("An error occurred during login. Please try again.");
+      console.error("Login error:", err);
     } finally {
-      setLoading(false); // Reset loading state
+      setLoading(false);
     }
   };
 
