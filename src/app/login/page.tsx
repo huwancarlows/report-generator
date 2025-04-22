@@ -2,42 +2,52 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-// Dummy user data
-const users = [
-  {
-    email: "admin@example.com",
-    password: "admin123",
-    role: "admin",
-  },
-  {
-    email: "user@example.com",
-    password: "user123",
-    role: "user",
-  },
-];
+import { supabase } from "../utils/supabaseClient"; // Import supabase client from utils
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const foundUser = users.find(
-      (user) => user.email === email && user.password === password
-    );
+    setLoading(true);
+    setError(""); // Reset error state
 
-    if (foundUser) {
-      if (foundUser.role === "admin") {
-        router.push("/admin");
-      } else if (foundUser.role === "user") {
-        router.push("/user");
-      } 
-    } else {
-      setError("Invalid credentials");
+    try {
+      // Query the profiles table to check if the email and password match
+      const { data, error: loginError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("email", email)
+        .eq("password", password)
+        .single();
+
+      if (loginError || !data) {
+        setError("Invalid credentials. Please try again.");
+        return;
+      }
+
+      // If login is successful, store user data in localStorage or a global state
+      localStorage.setItem("user", JSON.stringify(data));
+
+      // If login is successful, check the role and redirect accordingly
+      if (data) {
+        if (data.role === "admin") {
+          router.push("/admin");
+        } else if (data.role === "user") {
+          router.push("/user");
+        }
+      }
+    } catch (err) {
+      // Handle any other errors (e.g., network issues)
+      setError("An error occurred while connecting to the server. Please try again later.");
+      console.error("Error during login:", err);
+    } finally {
+      setLoading(false); // Reset loading state
     }
   };
 
@@ -47,9 +57,12 @@ export default function LoginPage() {
         <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white mb-6">
           Login to your account
         </h2>
+
+        {/* Display error messages */}
         {error && (
           <div className="text-red-500 text-sm text-center mb-4">{error}</div>
         )}
+
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -81,16 +94,12 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+            disabled={loading} // Disable the button while loading
+            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition disabled:bg-blue-300"
           >
-            Sign In
+            {loading ? "Logging in..." : "Sign In"}
           </button>
         </form>
-
-        <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-          Admin: <code>admin@example.com / admin123</code> <br />
-          User: <code>user@example.com / user123</code>
-        </p>
       </div>
     </div>
   );
