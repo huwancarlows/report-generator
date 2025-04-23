@@ -17,7 +17,8 @@ interface UserProfile {
 export default function ReportEntryPage() {
   const [reportData, setReportData] = useState<CompleteReport[] | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
-  const [exporting, setExporting] = useState<boolean>(false)
+  const [exportingSPRS, setExportingSPRS] = useState<boolean>(false)
+  const [exportingSummary, setExportingSummary] = useState<boolean>(false)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [selectedReportIndex, setSelectedReportIndex] = useState<number>(0)
   const { user } = useAuth()
@@ -63,15 +64,96 @@ export default function ReportEntryPage() {
     fetchReports()
   }, [router, user?.email])
 
-  const handleExportPDF = async (reportElement: HTMLElement, index: number) => {
-    const filename = `report-${reportData?.[index].reporting_period || 'report'}.pdf`
+  const handleExportSPRS = async (reportElement: HTMLElement, index: number) => {
+    const filename = `SPRS-${reportData?.[index].reporting_period || 'report'}.pdf`
     await exportToPDF(
       reportElement,
       filename,
-      () => setExporting(true),
-      () => setExporting(false)
+      () => setExportingSPRS(true),
+      () => setExportingSPRS(false)
     )
   }
+
+  const handleExportSummary = async (summaryElement: HTMLElement, index: number) => {
+    const filename = `Summary-${reportData?.[index].reporting_period || 'report'}.pdf`
+
+    // Create a container for the summary with header
+    const container = document.createElement('div')
+    container.style.padding = '20px'
+    container.style.backgroundColor = 'white'
+
+    // Add the header
+    const header = document.createElement('div')
+    header.innerHTML = `
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="font-size: 24px; margin-bottom: 8px;">Department of Labor and Employment</h1>
+        <p style="font-size: 18px; margin-bottom: 4px;">Summary Report on Implementation of Employment Programs</p>
+        <p style="font-size: 14px;">Reporting Period: ${reportData?.[index].reporting_period}</p>
+      </div>
+    `
+    container.appendChild(header)
+
+    // Clone the summary table
+    const summaryClone = summaryElement.cloneNode(true)
+    container.appendChild(summaryClone)
+
+    // Add to document temporarily
+    document.body.appendChild(container)
+
+    // Export to PDF
+    await exportToPDF(
+      container,
+      filename,
+      () => setExportingSummary(true),
+      () => setExportingSummary(false)
+    )
+
+    // Clean up
+    document.body.removeChild(container)
+  }
+
+  // Add this new function to calculate summary
+  const calculateSummary = (entries: CompleteReport['entries']) => {
+    const summary = {
+      vacancies: { male: 0, female: 0 },
+      registered: { male: 0, female: 0 },
+      referred: { male: 0, female: 0 },
+      placed: { male: 0, female: 0 }
+    };
+
+    entries.forEach(entry => {
+      if (entry.program === 'JOB_VACANCIES' && entry.sub_indicator === 'LOCAL_EMPLOYMENT') {
+        if (entry.sub_sub_indicator === 'FEMALE') {
+          summary.vacancies.female += entry.current_period;
+        } else {
+          summary.vacancies.male += entry.current_period;
+        }
+      }
+      if (entry.program === 'APPLICANTS_REGISTERED') {
+        if (entry.sub_sub_indicator === 'FEMALE') {
+          summary.registered.female += entry.current_period;
+        } else {
+          summary.registered.male += entry.current_period;
+        }
+      }
+      if (entry.program === 'APPLICANTS_REFERRED') {
+        if (entry.sub_sub_indicator === 'FEMALE') {
+          summary.referred.female += entry.current_period;
+        } else {
+          summary.referred.male += entry.current_period;
+        }
+      }
+      if (entry.program === 'APPLICANTS_PLACED') {
+        if (entry.sub_sub_indicator === 'FEMALE') {
+          summary.placed.female += entry.current_period;
+        } else {
+          summary.placed.male += entry.current_period;
+        }
+      }
+    });
+
+    return summary;
+  };
 
   if (loading) {
     return (
@@ -115,16 +197,31 @@ export default function ReportEntryPage() {
               </option>
             ))}
           </select>
-          <button
-            onClick={() => handleExportPDF(document.getElementById(`report-${selectedReportIndex}`)!, selectedReportIndex)}
-            disabled={exporting}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            <span>{exporting ? 'Exporting...' : 'Export PDF'}</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleExportSummary(
+                document.querySelector(`#report-${selectedReportIndex} .mb-8`)!,
+                selectedReportIndex
+              )}
+              disabled={exportingSummary}
+              className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>{exportingSummary ? 'Exporting...' : 'Export Summary'}</span>
+            </button>
+            <button
+              onClick={() => handleExportSPRS(document.getElementById(`report-${selectedReportIndex}`)!, selectedReportIndex)}
+              disabled={exportingSPRS}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>{exportingSPRS ? 'Exporting...' : 'Export SPRS'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -139,6 +236,65 @@ export default function ReportEntryPage() {
         </div>
 
         <div id={`report-${selectedReportIndex}`} className="p-6">
+          {/* Add Summary Report Section */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Summary Report</h3>
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="w-full border-collapse bg-white">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">LOCAL EMPLOYMENT</th>
+                    <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">MALE</th>
+                    <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">FEMALE</th>
+                    <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">TOTAL</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {reportData[selectedReportIndex].entries && (() => {
+                    const summary = calculateSummary(reportData[selectedReportIndex].entries);
+                    return (
+                      <>
+                        <tr className="bg-white">
+                          <td className="px-6 py-3 text-sm text-gray-900">Vacancies Solicited</td>
+                          <td className="px-6 py-3 text-center text-sm text-gray-900">{summary.vacancies.male}</td>
+                          <td className="px-6 py-3 text-center text-sm text-gray-900">{summary.vacancies.female}</td>
+                          <td className="px-6 py-3 text-center text-sm font-medium text-gray-900">
+                            {summary.vacancies.male + summary.vacancies.female}
+                          </td>
+                        </tr>
+                        <tr className="bg-gray-50">
+                          <td className="px-6 py-3 text-sm text-gray-900">Applicant's Registered</td>
+                          <td className="px-6 py-3 text-center text-sm text-gray-900">{summary.registered.male}</td>
+                          <td className="px-6 py-3 text-center text-sm text-gray-900">{summary.registered.female}</td>
+                          <td className="px-6 py-3 text-center text-sm font-medium text-gray-900">
+                            {summary.registered.male + summary.registered.female}
+                          </td>
+                        </tr>
+                        <tr className="bg-white">
+                          <td className="px-6 py-3 text-sm text-gray-900">Applicant's Referred</td>
+                          <td className="px-6 py-3 text-center text-sm text-gray-900">{summary.referred.male}</td>
+                          <td className="px-6 py-3 text-center text-sm text-gray-900">{summary.referred.female}</td>
+                          <td className="px-6 py-3 text-center text-sm font-medium text-gray-900">
+                            {summary.referred.male + summary.referred.female}
+                          </td>
+                        </tr>
+                        <tr className="bg-gray-50">
+                          <td className="px-6 py-3 text-sm text-gray-900">Applicant's Placed</td>
+                          <td className="px-6 py-3 text-center text-sm text-gray-900">{summary.placed.male}</td>
+                          <td className="px-6 py-3 text-center text-sm text-gray-900">{summary.placed.female}</td>
+                          <td className="px-6 py-3 text-center text-sm font-medium text-gray-900">
+                            {summary.placed.male + summary.placed.female}
+                          </td>
+                        </tr>
+                      </>
+                    );
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Existing report period and office section */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
               <label className="block text-sm font-medium text-gray-500 mb-1">Reporting Period</label>

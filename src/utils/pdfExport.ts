@@ -11,22 +11,38 @@ const applyStyles = ({ element, styles }: StyleOptions) => {
 }
 
 const setupBasicStyles = (clone: HTMLElement) => {
-    clone.style.width = '297mm' // A4 width
-    clone.style.height = '210mm' // A4 height
-    clone.style.padding = '10mm'
-    clone.style.margin = '0'
-    clone.style.backgroundColor = '#ffffff'
+    // Set container styles
+    applyStyles({
+        element: clone,
+        styles: {
+            position: 'absolute',
+            left: '0',
+            top: '0',
+            width: '100%',
+            backgroundColor: '#ffffff',
+            padding: '20px',
+            margin: '0',
+            boxSizing: 'border-box',
+            zIndex: '-1'
+        }
+    })
 
-    // Remove all Tailwind classes and set basic styles
+    // Remove all Tailwind classes but keep structure
     const elements = clone.querySelectorAll('*')
     elements.forEach(element => {
         const el = element as HTMLElement
-        el.className = ''
+        // Keep only grid-related classes if they exist
+        const gridClasses = el.className.split(' ').filter(cls =>
+            cls.includes('grid-') || cls.includes('col-')
+        ).join(' ')
+        el.className = gridClasses
+
+        // Ensure text is visible
         applyStyles({
             element: el,
             styles: {
-                backgroundColor: '#ffffff',
                 color: '#000000',
+                backgroundColor: 'transparent',
                 borderColor: '#000000',
                 fontFamily: 'Arial, sans-serif'
             }
@@ -35,90 +51,75 @@ const setupBasicStyles = (clone: HTMLElement) => {
 }
 
 const setupTableStyles = (clone: HTMLElement) => {
-    // Style table
-    const table = clone.querySelector('table')
-    if (table) {
+    // Style main table
+    const tables = clone.querySelectorAll('table')
+    tables.forEach(table => {
         applyStyles({
-            element: table,
+            element: table as HTMLElement,
             styles: {
                 width: '100%',
                 borderCollapse: 'collapse',
-                pageBreakInside: 'auto',
+                marginBottom: '20px',
                 fontSize: '10px'
             }
         })
-    }
 
-    // Style table headers
-    const ths = clone.querySelectorAll('th')
-    ths.forEach(th => {
-        applyStyles({
-            element: th,
-            styles: {
-                border: '1px solid #000000',
-                padding: '4px',
-                textAlign: 'center',
-                verticalAlign: 'middle',
-                fontWeight: 'bold',
-                fontSize: '10px',
-                lineHeight: '1.2'
-            }
+        // Style table headers
+        const headers = table.querySelectorAll('th')
+        headers.forEach(header => {
+            applyStyles({
+                element: header as HTMLElement,
+                styles: {
+                    border: '1px solid #000000',
+                    padding: '8px',
+                    backgroundColor: '#f3f4f6',
+                    textAlign: 'center',
+                    fontWeight: 'bold'
+                }
+            })
         })
-    })
 
-    // Style table cells
-    const tds = clone.querySelectorAll('td')
-    tds.forEach(td => {
-        applyStyles({
-            element: td,
-            styles: {
-                border: '1px solid #000000',
-                padding: '4px',
-                fontSize: '10px',
-                lineHeight: '1.2',
-                verticalAlign: 'top'
-            }
+        // Style table cells
+        const cells = table.querySelectorAll('td')
+        cells.forEach(cell => {
+            applyStyles({
+                element: cell as HTMLElement,
+                styles: {
+                    border: '1px solid #000000',
+                    padding: '8px',
+                    textAlign: 'left'
+                }
+            })
         })
     })
 }
 
 const setupContentStyles = (clone: HTMLElement) => {
-    // Style indicators and sub-indicators
-    const indicators = clone.querySelectorAll('.space-y-1')
-    indicators.forEach(indicator => {
+    // Style headings
+    const headings = clone.querySelectorAll('h1, h2, h3')
+    headings.forEach(heading => {
         applyStyles({
-            element: indicator as HTMLElement,
+            element: heading as HTMLElement,
             styles: {
-                marginLeft: '0',
-                paddingLeft: '0'
-            }
-        })
-    })
-
-    // Style header text
-    const headerTexts = clone.querySelectorAll('.text-2xl, .text-lg, .text-sm')
-    headerTexts.forEach(text => {
-        applyStyles({
-            element: text as HTMLElement,
-            styles: {
-                marginBottom: '4px',
+                marginBottom: '10px',
+                fontWeight: 'bold',
                 textAlign: 'center'
             }
         })
     })
 
-    // Adjust grid layout for header info
-    const gridContainer = clone.querySelector('.grid')
-    if (gridContainer) {
+    // Style grid containers
+    const grids = clone.querySelectorAll('.grid')
+    grids.forEach(grid => {
         applyStyles({
-            element: gridContainer as HTMLElement,
+            element: grid as HTMLElement,
             styles: {
-                display: 'flex',
-                justifyContent: 'space-between',
+                display: 'grid',
+                gap: '20px',
                 marginBottom: '20px'
             }
         })
-    }
+    })
 
     // Style footer section
     const footerSection = clone.querySelector('.mt-8')
@@ -126,10 +127,66 @@ const setupContentStyles = (clone: HTMLElement) => {
         applyStyles({
             element: footerSection as HTMLElement,
             styles: {
-                marginTop: '20px',
-                display: 'flex',
-                justifyContent: 'space-between'
+                marginTop: '30px',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '20px'
             }
+        })
+    }
+}
+
+const setupSummaryStyles = (clone: HTMLElement) => {
+    // Style the header
+    const header = clone.querySelector('div[style*="text-align: center"]')
+    if (header) {
+        const elements = header.querySelectorAll('*')
+        elements.forEach(element => {
+            const el = element as HTMLElement
+            el.style.color = '#000000'
+            el.style.fontFamily = 'Arial, sans-serif'
+        })
+    }
+
+    // Style the summary table
+    const table = clone.querySelector('table')
+    if (table) {
+        applyStyles({
+            element: table,
+            styles: {
+                width: '100%',
+                borderCollapse: 'collapse',
+                marginTop: '20px',
+                fontSize: '12px'
+            }
+        })
+
+        // Style headers
+        const headers = table.querySelectorAll('th')
+        headers.forEach(header => {
+            applyStyles({
+                element: header as HTMLElement,
+                styles: {
+                    backgroundColor: '#f3f4f6',
+                    border: '1px solid #000000',
+                    padding: '8px',
+                    textAlign: 'center',
+                    fontWeight: 'bold'
+                }
+            })
+        })
+
+        // Style cells
+        const cells = table.querySelectorAll('td')
+        cells.forEach(cell => {
+            applyStyles({
+                element: cell as HTMLElement,
+                styles: {
+                    border: '1px solid #000000',
+                    padding: '8px',
+                    textAlign: 'center'
+                }
+            })
         })
     }
 }
@@ -145,29 +202,52 @@ export const exportToPDF = async (
 
         // Create a clone of the report element
         const clone = reportElement.cloneNode(true) as HTMLElement
-        document.body.appendChild(clone)
 
-        // Apply all styles
+        // Create a temporary container
+        const container = document.createElement('div')
+        container.style.position = 'absolute'
+        container.style.left = '-9999px'
+        container.style.top = '0'
+        container.appendChild(clone)
+        document.body.appendChild(container)
+
+        // Apply styles
         setupBasicStyles(clone)
         setupTableStyles(clone)
         setupContentStyles(clone)
 
-        // Capture the clone with html2canvas
-        const canvas = await html2canvas(clone, {
+        // Wait for fonts and images to load
+        await document.fonts.ready
+
+        // Configure canvas options
+        const canvasOptions = {
             scale: 2,
             useCORS: true,
-            logging: false,
+            logging: true,
             backgroundColor: '#ffffff',
-            windowWidth: 2480, // A4 width at 300 DPI
-            windowHeight: 3508, // A4 height at 300 DPI
-        })
+            windowWidth: filename.startsWith('Summary-') ? 1240 : 2480,
+            windowHeight: filename.startsWith('Summary-') ? 1754 : 3508,
+            allowTaint: true,
+            foreignObjectRendering: true,
+            onclone: (clonedDoc: Document) => {
+                const clonedElement = clonedDoc.body.firstChild as HTMLElement
+                if (clonedElement) {
+                    setupBasicStyles(clonedElement)
+                    setupTableStyles(clonedElement)
+                    setupContentStyles(clonedElement)
+                }
+            }
+        }
 
-        // Remove the clone after capturing
-        document.body.removeChild(clone)
+        // Capture the clone with html2canvas
+        const canvas = await html2canvas(clone, canvasOptions)
 
-        // Create PDF in landscape orientation
+        // Remove the temporary container
+        document.body.removeChild(container)
+
+        // Create PDF with appropriate orientation
         const pdf = new jsPDF({
-            orientation: 'landscape',
+            orientation: filename.startsWith('Summary-') ? 'portrait' : 'landscape',
             unit: 'mm',
             format: 'a4',
         })
