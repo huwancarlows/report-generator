@@ -28,10 +28,10 @@ export default function DashboardPage() {
     setIsExporting(true);
     try {
       if (dashboardRef.current) {
-        // Create a clone of the dashboard
+        // Create a clone of the dashboard for export
         const clone = dashboardRef.current.cloneNode(true) as HTMLElement;
-        
-        // Remove dark mode classes
+
+        // Temporarily remove dark mode classes to ensure they don't affect the image export
         clone.classList.remove('dark');
         clone.querySelectorAll('.dark\\:bg-gray-900').forEach(el => {
           el.classList.remove('dark:bg-gray-900');
@@ -50,23 +50,23 @@ export default function DashboardPage() {
           el.classList.add('text-blue-600');
         });
 
-        // Append clone to body (temporarily)
+        // Temporarily append the clone to body for capturing
         document.body.appendChild(clone);
         clone.style.position = 'absolute';
         clone.style.left = '-9999px';
 
-        // Capture the clone
+        // Capture the clone with html2canvas
         const canvas = await html2canvas(clone, {
           scale: 2,
           useCORS: true,
           logging: false,
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff', // Ensure the background is white
         });
 
-        // Remove the clone
+        // Remove the clone after capturing
         document.body.removeChild(clone);
 
-        // Create download link
+        // Create a link to download the canvas image as a PNG
         const link = document.createElement('a');
         link.download = 'dashboard-report.png';
         link.href = canvas.toDataURL('image/png');
@@ -87,7 +87,7 @@ export default function DashboardPage() {
     datasets: [{
       label: 'Performance',
       data: [65, 59, 80, 81, 56, 55],
-      backgroundColor: 'rgb(59, 130, 246, 0.5)',
+      backgroundColor: 'rgba(59, 130, 246, 0.5)',
       borderColor: 'rgb(59, 130, 246)',
       borderWidth: 1,
     }]
@@ -134,7 +134,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div ref={dashboardRef} className="p-6 space-y-8 min-h-screen bg-gray-50 dark:bg-neutral-900 text-gray-800 dark:text-white">
+    <div ref={dashboardRef} className="p-6 space-y-8 min-h-screen bg-gray-50 text-gray-800">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Employment Dashboard</h1>
         <button
@@ -147,7 +147,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Cumulative Performance */}
-      <section className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow">
+      <section className="bg-white rounded-xl p-6 shadow">
         <h2 className="text-lg font-semibold mb-4">Cumulative Performance of the 26 PESO</h2>
         <div className="h-60">
           <Bar
@@ -159,25 +159,25 @@ export default function DashboardPage() {
                 legend: {
                   position: 'top' as const,
                   labels: {
-                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#1f2937'
+                    color: '#1f2937'
                   }
                 },
               },
               scales: {
                 x: {
                   ticks: {
-                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#1f2937'
+                    color: '#1f2937'
                   },
                   grid: {
-                    color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                    color: 'rgba(0, 0, 0, 0.1)'
                   }
                 },
                 y: {
                   ticks: {
-                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#1f2937'
+                    color: '#1f2937'
                   },
                   grid: {
-                    color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                    color: 'rgba(0, 0, 0, 0.1)'
                   }
                 }
               }
@@ -189,15 +189,15 @@ export default function DashboardPage() {
       {/* Key Metrics */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {["Solicited", "Registered", "Referred", "Placed"].map((metric) => (
-          <div key={metric} className="bg-white dark:bg-neutral-800 p-4 rounded-lg shadow text-center">
+          <div key={metric} className="bg-white p-4 rounded-lg shadow text-center">
             <h3 className="text-md font-medium">{metric}</h3>
-            <p className="text-3xl font-bold mt-2 text-blue-600 dark:text-blue-400">0</p>
+            <p className="text-3xl font-bold mt-2 text-blue-600">0</p>
           </div>
         ))}
       </section>
 
       {/* Gender Distribution */}
-      <section className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow">
+      <section className="bg-white rounded-xl p-6 shadow">
         <h2 className="text-lg font-semibold mb-4">Gender of Registered Applicants</h2>
         <div className="h-60">
           <Pie
@@ -209,7 +209,7 @@ export default function DashboardPage() {
                 legend: {
                   position: 'right' as const,
                   labels: {
-                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#1f2937'
+                    color: '#1f2937'
                   }
                 },
               },
@@ -219,7 +219,7 @@ export default function DashboardPage() {
       </section>
 
       {/* Educational Attainment */}
-      <section className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow">
+      <section className="bg-white rounded-xl p-6 shadow">
         <h2 className="text-lg font-semibold mb-4">Applicants by Educational Attainment</h2>
         <div className="h-60">
           <Pie
@@ -231,7 +231,7 @@ export default function DashboardPage() {
                 legend: {
                   position: 'right' as const,
                   labels: {
-                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#1f2937'
+                    color: '#1f2937'
                   }
                 },
               },
@@ -241,7 +241,7 @@ export default function DashboardPage() {
       </section>
 
       {/* Placement in Private vs Government */}
-      <section className="bg-white dark:bg-neutral-800 rounded-xl p-6 shadow">
+      <section className="bg-white rounded-xl p-6 shadow">
         <h2 className="text-lg font-semibold mb-4">Placed Applicants (Private vs Government)</h2>
         <div className="h-60">
           <Pie
@@ -253,7 +253,7 @@ export default function DashboardPage() {
                 legend: {
                   position: 'right' as const,
                   labels: {
-                    color: document.documentElement.classList.contains('dark') ? '#fff' : '#1f2937'
+                    color: '#1f2937'
                   }
                 },
               },
@@ -264,4 +264,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

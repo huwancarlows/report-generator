@@ -26,8 +26,8 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
       <main className={`flex-1 p-6 ${!shouldShowSidebar ? 'mx-auto max-w-4xl' : ''}`}>
         {shouldShowSidebar && (
           <header className="mb-6 border-b pb-4">
-            <h1 className="text-2xl font-bold">Your App Name</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Welcome!</p>
+            <h1 className="text-2xl font-bold">DOLE Region X</h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Welcome to the report generator</p>
           </header>
         )}
         {children}

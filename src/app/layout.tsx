@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
 import LayoutClient from "./layout-client";
 
+// Load fonts
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -14,9 +15,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Update metadata with your app's title and description
 export const metadata: Metadata = {
-  title: "Your App Title",
-  description: "Your App Description",
+  title: "DOLE Region X",
+  description: "Official Portal for DOLE Region X",
 };
 
 export default function RootLayout({
