@@ -1,6 +1,8 @@
 export type ProgramType =
   | 'JOB_VACANCIES'
   | 'APPLICANTS_REGISTERED'
+  | 'APPLICANTS_REFERRED'
+  | 'APPLICANTS_PLACED'
   | 'PWD_PROJECTS'
   | 'PWD_TRAINING'
   | 'APPLICANTS_COUNSELLED'
@@ -17,8 +19,16 @@ export interface Report {
   reporting_office: string;
   created_at: string;
   updated_at: string;
-  created_by: string;
   status: ReportStatus;
+}
+
+export interface Profile {
+  id: number;
+  email: string;
+  role: 'admin' | 'user';
+  name: string;
+  municipal_mayor: string;
+  address: string;
 }
 
 export interface EmploymentFacilitation {

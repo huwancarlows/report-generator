@@ -2,18 +2,34 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
-import { Bar, Pie } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement } from 'chart.js';
+import { Bar, Pie, Line } from 'react-chartjs-2';
 import html2canvas from 'html2canvas';
 
 // Register ChartJS components
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement
+);
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const dashboardRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const chartRefs = {
+    performance: useRef<HTMLDivElement>(null),
+    jobs: useRef<HTMLDivElement>(null),
+    gender: useRef<HTMLDivElement>(null),
+    education: useRef<HTMLDivElement>(null),
+    sector: useRef<HTMLDivElement>(null)
+  };
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "null");
@@ -24,52 +40,50 @@ export default function DashboardPage() {
     }
   }, [router]);
 
-  const handleExport = async () => {
+  const handleExport = async (chartName: string) => {
     setIsExporting(true);
     try {
-      if (dashboardRef.current) {
-        // Create a clone of the dashboard for export
-        const clone = dashboardRef.current.cloneNode(true) as HTMLElement;
-
-        // Temporarily remove dark mode classes to ensure they don't affect the image export
-        clone.classList.remove('dark');
-        clone.querySelectorAll('.dark\\:bg-gray-900').forEach(el => {
-          el.classList.remove('dark:bg-gray-900');
-          el.classList.add('bg-white');
-        });
-        clone.querySelectorAll('.dark\\:bg-gray-800').forEach(el => {
-          el.classList.remove('dark:bg-gray-800');
-          el.classList.add('bg-gray-100');
-        });
-        clone.querySelectorAll('.dark\\:text-white').forEach(el => {
-          el.classList.remove('dark:text-white');
-          el.classList.add('text-gray-900');
-        });
-        clone.querySelectorAll('.dark\\:text-blue-400').forEach(el => {
-          el.classList.remove('dark:text-blue-400');
-          el.classList.add('text-blue-600');
-        });
-
-        // Temporarily append the clone to body for capturing
+      const chartRef = chartRefs[chartName as keyof typeof chartRefs];
+      if (chartRef.current) {
+        const clone = chartRef.current.cloneNode(true) as HTMLElement;
         document.body.appendChild(clone);
         clone.style.position = 'absolute';
         clone.style.left = '-9999px';
+        clone.style.backgroundColor = '#ffffff';
+        clone.style.padding = '20px';
 
-        // Capture the clone with html2canvas
-        const canvas = await html2canvas(clone, {
+        // Remove all Tailwind classes and set basic styles
+        const elements = clone.querySelectorAll('*');
+        elements.forEach(element => {
+          const el = element as HTMLElement;
+          el.className = ''; // Remove all classes
+          el.style.backgroundColor = '#ffffff';
+          el.style.color = '#000000';
+          el.style.borderColor = '#000000';
+        });
+
+        // Ensure canvas is visible
+        const canvas = clone.querySelector('canvas');
+        if (canvas) {
+          canvas.style.display = 'block';
+          canvas.style.width = '100%';
+          canvas.style.height = 'auto';
+        }
+
+        const exportCanvas = await html2canvas(clone, {
           scale: 2,
           useCORS: true,
           logging: false,
-          backgroundColor: '#ffffff', // Ensure the background is white
+          backgroundColor: '#ffffff',
+          allowTaint: true,
+          foreignObjectRendering: true
         });
 
-        // Remove the clone after capturing
         document.body.removeChild(clone);
 
-        // Create a link to download the canvas image as a PNG
         const link = document.createElement('a');
-        link.download = 'dashboard-report.png';
-        link.href = canvas.toDataURL('image/png');
+        link.download = `${chartName}-report.png`;
+        link.href = exportCanvas.toDataURL('image/png');
         link.click();
       }
     } catch (error) {
@@ -82,13 +96,63 @@ export default function DashboardPage() {
   if (!user) return null;
 
   // Sample data - replace with real data from your backend
-  const performanceData = {
+  const monthlyData = {
     labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    datasets: [
+      {
+        label: 'Solicited',
+        data: [120, 150, 180, 200, 220, 250],
+        borderColor: '#0000ff',
+        backgroundColor: 'rgba(0, 0, 255, 0.1)',
+        tension: 0.4,
+        pointRadius: 4,
+        pointBackgroundColor: '#0000ff',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+      },
+      {
+        label: 'Registered',
+        data: [100, 130, 160, 180, 200, 230],
+        borderColor: '#008000',
+        backgroundColor: 'rgba(0, 128, 0, 0.1)',
+        tension: 0.4,
+        pointRadius: 4,
+        pointBackgroundColor: '#008000',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+      },
+      {
+        label: 'Referred',
+        data: [80, 110, 140, 160, 180, 210],
+        borderColor: '#ffa500',
+        backgroundColor: 'rgba(255, 165, 0, 0.1)',
+        tension: 0.4,
+        pointRadius: 4,
+        pointBackgroundColor: '#ffa500',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+      },
+      {
+        label: 'Placed',
+        data: [60, 90, 120, 140, 160, 190],
+        borderColor: '#ff0000',
+        backgroundColor: 'rgba(255, 0, 0, 0.1)',
+        tension: 0.4,
+        pointRadius: 4,
+        pointBackgroundColor: '#ff0000',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+      }
+    ]
+  };
+
+  const topJobsData = {
+    labels: ['Customer Service', 'Sales Associate', 'Admin Staff', 'IT Support', 'Accountant', 'Teacher', 'Nurse', 'Driver', 'Security Guard', 'Factory Worker'],
     datasets: [{
-      label: 'Performance',
-      data: [65, 59, 80, 81, 56, 55],
-      backgroundColor: 'rgba(59, 130, 246, 0.5)',
-      borderColor: 'rgb(59, 130, 246)',
+      label: 'Available Positions',
+      data: [50, 45, 40, 35, 30, 25, 20, 15, 10, 5],
+      backgroundColor: '#0000ff',
+      borderColor: '#0000cc',
       borderWidth: 1,
     }]
   };
@@ -97,8 +161,8 @@ export default function DashboardPage() {
     labels: ['Male', 'Female'],
     datasets: [{
       data: [60, 40],
-      backgroundColor: ['rgb(59, 130, 246, 0.5)', 'rgb(239, 68, 68, 0.5)'],
-      borderColor: ['rgb(59, 130, 246)', 'rgb(239, 68, 68)'],
+      backgroundColor: ['#0000ff', '#ff0000'],
+      borderColor: ['#0000cc', '#cc0000'],
       borderWidth: 1,
     }]
   };
@@ -107,18 +171,8 @@ export default function DashboardPage() {
     labels: ['High School', 'College', 'Vocational', 'Post-Grad'],
     datasets: [{
       data: [30, 45, 15, 10],
-      backgroundColor: [
-        'rgb(239, 68, 68, 0.5)',
-        'rgb(59, 130, 246, 0.5)',
-        'rgb(234, 179, 8, 0.5)',
-        'rgb(20, 184, 166, 0.5)',
-      ],
-      borderColor: [
-        'rgb(239, 68, 68)',
-        'rgb(59, 130, 246)',
-        'rgb(234, 179, 8)',
-        'rgb(20, 184, 166)',
-      ],
+      backgroundColor: ['#0000ff', '#008000', '#ffa500', '#800080'],
+      borderColor: ['#0000cc', '#006400', '#cc8400', '#660066'],
       borderWidth: 1,
     }]
   };
@@ -127,57 +181,62 @@ export default function DashboardPage() {
     labels: ['Private', 'Government'],
     datasets: [{
       data: [70, 30],
-      backgroundColor: ['rgb(20, 184, 166, 0.5)', 'rgb(124, 58, 237, 0.5)'],
-      borderColor: ['rgb(20, 184, 166)', 'rgb(124, 58, 237)'],
+      backgroundColor: ['#0000ff', '#008000'],
+      borderColor: ['#0000cc', '#006400'],
       borderWidth: 1,
     }]
   };
 
   return (
-    <div ref={dashboardRef} className="p-6 space-y-8 min-h-screen bg-gray-50 text-gray-800">
+    <div className="p-6 space-y-8 min-h-screen bg-white">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Employment Dashboard</h1>
-        <button
-          onClick={handleExport}
-          disabled={isExporting}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300"
-        >
-          {isExporting ? 'Exporting...' : 'Export Dashboard'}
-        </button>
+        <h1 className="text-2xl font-bold text-black">Employment Dashboard</h1>
       </div>
 
       {/* Cumulative Performance */}
-      <section className="bg-white rounded-xl p-6 shadow">
-        <h2 className="text-lg font-semibold mb-4">Cumulative Performance of the 26 PESO</h2>
-        <div className="h-60">
-          <Bar
-            data={performanceData}
+      <section ref={chartRefs.performance} className="bg-white rounded-lg p-6 shadow border border-gray-300">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-black">CUMULATIVE PERFORMANCE OF THE 26 PESO</h2>
+          <button
+            onClick={() => handleExport('performance')}
+            disabled={isExporting}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
+          >
+            {isExporting ? 'Exporting...' : 'Export Chart'}
+          </button>
+        </div>
+        <div className="h-80">
+          <Line
+            data={monthlyData}
             options={{
               responsive: true,
               maintainAspectRatio: false,
               plugins: {
                 legend: {
-                  position: 'top' as const,
+                  position: 'top',
                   labels: {
-                    color: '#1f2937'
+                    color: '#000000',
+                    font: {
+                      size: 12
+                    }
                   }
                 },
               },
               scales: {
                 x: {
-                  ticks: {
-                    color: '#1f2937'
-                  },
                   grid: {
                     color: 'rgba(0, 0, 0, 0.1)'
+                  },
+                  ticks: {
+                    color: '#000000'
                   }
                 },
                 y: {
-                  ticks: {
-                    color: '#1f2937'
-                  },
                   grid: {
                     color: 'rgba(0, 0, 0, 0.1)'
+                  },
+                  ticks: {
+                    color: '#000000'
                   }
                 }
               }
@@ -186,20 +245,66 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Key Metrics */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {["Solicited", "Registered", "Referred", "Placed"].map((metric) => (
-          <div key={metric} className="bg-white p-4 rounded-lg shadow text-center">
-            <h3 className="text-md font-medium">{metric}</h3>
-            <p className="text-3xl font-bold mt-2 text-blue-600">0</p>
-          </div>
-        ))}
+      {/* Top 10 Available Jobs */}
+      <section ref={chartRefs.jobs} className="bg-white rounded-lg p-6 shadow border border-gray-300">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-black">Top 10 Available Jobs</h2>
+          <button
+            onClick={() => handleExport('jobs')}
+            disabled={isExporting}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
+          >
+            {isExporting ? 'Exporting...' : 'Export Chart'}
+          </button>
+        </div>
+        <div className="h-80">
+          <Bar
+            data={topJobsData}
+            options={{
+              indexAxis: 'y',
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  display: false
+                },
+              },
+              scales: {
+                x: {
+                  grid: {
+                    color: 'rgba(0, 0, 0, 0.1)'
+                  },
+                  ticks: {
+                    color: '#000000'
+                  }
+                },
+                y: {
+                  grid: {
+                    color: 'rgba(0, 0, 0, 0.1)'
+                  },
+                  ticks: {
+                    color: '#000000'
+                  }
+                }
+              }
+            }}
+          />
+        </div>
       </section>
 
       {/* Gender Distribution */}
-      <section className="bg-white rounded-xl p-6 shadow">
-        <h2 className="text-lg font-semibold mb-4">Gender of Registered Applicants</h2>
-        <div className="h-60">
+      <section ref={chartRefs.gender} className="bg-white rounded-lg p-6 shadow border border-gray-300">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-black">Gender of Registered Applicants</h2>
+          <button
+            onClick={() => handleExport('gender')}
+            disabled={isExporting}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
+          >
+            {isExporting ? 'Exporting...' : 'Export Chart'}
+          </button>
+        </div>
+        <div className="h-80">
           <Pie
             data={genderData}
             options={{
@@ -207,9 +312,12 @@ export default function DashboardPage() {
               maintainAspectRatio: false,
               plugins: {
                 legend: {
-                  position: 'right' as const,
+                  position: 'right',
                   labels: {
-                    color: '#1f2937'
+                    color: '#000000',
+                    font: {
+                      size: 12
+                    }
                   }
                 },
               },
@@ -219,9 +327,18 @@ export default function DashboardPage() {
       </section>
 
       {/* Educational Attainment */}
-      <section className="bg-white rounded-xl p-6 shadow">
-        <h2 className="text-lg font-semibold mb-4">Applicants by Educational Attainment</h2>
-        <div className="h-60">
+      <section ref={chartRefs.education} className="bg-white rounded-lg p-6 shadow border border-gray-300">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-black">Applicants by Educational Attainment</h2>
+          <button
+            onClick={() => handleExport('education')}
+            disabled={isExporting}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
+          >
+            {isExporting ? 'Exporting...' : 'Export Chart'}
+          </button>
+        </div>
+        <div className="h-80">
           <Pie
             data={educationData}
             options={{
@@ -229,9 +346,12 @@ export default function DashboardPage() {
               maintainAspectRatio: false,
               plugins: {
                 legend: {
-                  position: 'right' as const,
+                  position: 'right',
                   labels: {
-                    color: '#1f2937'
+                    color: '#000000',
+                    font: {
+                      size: 12
+                    }
                   }
                 },
               },
@@ -241,9 +361,18 @@ export default function DashboardPage() {
       </section>
 
       {/* Placement in Private vs Government */}
-      <section className="bg-white rounded-xl p-6 shadow">
-        <h2 className="text-lg font-semibold mb-4">Placed Applicants (Private vs Government)</h2>
-        <div className="h-60">
+      <section ref={chartRefs.sector} className="bg-white rounded-lg p-6 shadow border border-gray-300">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-black">Placed Applicants in Private vs Government Sector</h2>
+          <button
+            onClick={() => handleExport('sector')}
+            disabled={isExporting}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
+          >
+            {isExporting ? 'Exporting...' : 'Export Chart'}
+          </button>
+        </div>
+        <div className="h-80">
           <Pie
             data={sectorData}
             options={{
@@ -251,9 +380,12 @@ export default function DashboardPage() {
               maintainAspectRatio: false,
               plugins: {
                 legend: {
-                  position: 'right' as const,
+                  position: 'right',
                   labels: {
-                    color: '#1f2937'
+                    color: '#000000',
+                    font: {
+                      size: 12
+                    }
                   }
                 },
               },

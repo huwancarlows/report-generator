@@ -1,7 +1,5 @@
 import { supabase, handleSupabaseError } from '../lib/supabase';
-import { CompleteReport, EmploymentFacilitation, Report } from '../types/database.types';
-
-
+import { CompleteReport, EmploymentFacilitation, Report, ProgramType } from '../types/database.types';
 
 export const reportService = {
   async createReport(
@@ -10,17 +8,41 @@ export const reportService = {
     entries: Omit<EmploymentFacilitation, 'id' | 'report_id' | 'created_at' | 'updated_at'>[]
   ): Promise<CompleteReport | null> {
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error('Session error:', sessionError);
-        return null;
-      }
-  
-      if (!session?.user?.id) {
+      // Get user from localStorage instead of Supabase session
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) {
         console.error('No authenticated user found');
         return null;
       }
-  
+
+      const user = JSON.parse(storedUser);
+      if (!user?.id || !user?.email) {
+        console.error('Invalid user data');
+        return null;
+      }
+
+      // Fetch user profile data
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('name, municipal_mayor, address')
+        .eq('email', user.email)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching user profile:', profileError);
+        return null;
+      }
+
+      // Validate the `program` field for each entry
+      const isValid = entries.every(entry =>
+        this.isValidProgram(entry.program)
+      );
+
+      if (!isValid) {
+        console.error('One or more programs are invalid.');
+        return null;
+      }
+
       const { error: rpcError } = await supabase.rpc("insert_employment_report", {
         reporting_period: reportingPeriod,
         reporting_office: reportingOffice,
@@ -33,13 +55,16 @@ export const reportService = {
           current_period: entry.current_period,
           remarks: entry.remarks,
         })),
+        user_name: userProfile.name,
+        municipal_mayor: userProfile.municipal_mayor,
+        office_address: userProfile.address
       });
-  
+
       if (rpcError) {
         console.error('Error executing insert_employment_report function:', rpcError.message);
         return handleSupabaseError<null>(rpcError, null);
       }
-  
+
       // Optionally fetch the latest report to return
       const { data: recentReports, error: fetchError } = await supabase
         .from("employment_reports")
@@ -49,12 +74,12 @@ export const reportService = {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-  
+
       if (fetchError || !recentReports) {
         console.error("Failed to fetch newly inserted report");
         return handleSupabaseError<null>(fetchError, null);
       }
-  
+
       return {
         ...recentReports,
         entries: recentReports.employment_facilitation_entries || [],
@@ -65,6 +90,22 @@ export const reportService = {
     }
   },
 
+  isValidProgram(program: string): program is ProgramType {
+    return [
+      'JOB_VACANCIES',
+      'APPLICANTS_REGISTERED',
+      'APPLICANTS_REFERRED',
+      'APPLICANTS_PLACED',
+      'PWD_PROJECTS',
+      'PWD_TRAINING',
+      'APPLICANTS_COUNSELLED',
+      'APPLICANTS_TESTED',
+      'CAREER_GUIDANCE',
+      'JOB_FAIR',
+      'LIVELIHOOD'
+    ].includes(program);
+  },
+
   async getReport(id: string): Promise<CompleteReport | null> {
     try {
       // Fetch the report from the correct table
@@ -73,17 +114,17 @@ export const reportService = {
         .select('*')
         .eq('id', id)
         .single();
-  
+
       if (reportError) return handleSupabaseError<null>(reportError, null);
-  
+
       // Fetch related entries from employment_facilitation_entries
       const { data: entries, error: entriesError } = await supabase
         .from('employment_facilitation_entries')  // Corrected table name
         .select('*')
         .eq('report_id', id);
-  
+
       if (entriesError) return handleSupabaseError<null>(entriesError, null);
-  
+
       return {
         ...report,
         entries: entries || [],
@@ -92,19 +133,44 @@ export const reportService = {
       return handleSupabaseError<null>(error, null);
     }
   },
-  
 
   async getUserReports(): Promise<CompleteReport[]> {
     try {
-      const { data, error } = await supabase
-        .from('employment_reports')  // Correct table for reports
-        .select('*, employment_facilitation_entries(*)')  // Ensure entries are included
-        .order('created_at', { ascending: false });  // Optional: Sorting reports by creation date
+      // First get the reports
+      const { data: reports, error: reportsError } = await supabase
+        .from('employment_reports')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (error) return handleSupabaseError<CompleteReport[]>(error, []);
-      return data || [];
+      if (reportsError) {
+        console.error('Error fetching reports:', reportsError);
+        return [];
+      }
+
+      if (!reports || reports.length === 0) {
+        return [];
+      }
+
+      // Then get all entries for these reports
+      const reportIds = reports.map(report => report.id);
+      const { data: entries, error: entriesError } = await supabase
+        .from('employment_facilitation_entries')
+        .select('*')
+        .in('report_id', reportIds);
+
+      if (entriesError) {
+        console.error('Error fetching entries:', entriesError);
+        return [];
+      }
+
+      // Combine reports with their entries
+      return reports.map(report => ({
+        ...report,
+        entries: entries?.filter(entry => entry.report_id === report.id) || []
+      }));
     } catch (error) {
-      return handleSupabaseError<CompleteReport[]>(error, []);
+      console.error('Unexpected error in getUserReports:', error);
+      return [];
     }
   },
 

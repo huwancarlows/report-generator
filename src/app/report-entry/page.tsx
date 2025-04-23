@@ -1,92 +1,255 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { reportService } from '@/services/reportService' // adjust the path if needed
+import { reportService } from '@/services/reportService'
 import { CompleteReport } from '@/types/database.types'
+import { useAuth } from '../context/AuthContext'
+import { exportToPDF } from '@/utils/pdfExport'
+import { useRouter } from 'next/navigation'
+import { supabase } from '../utils/supabaseClient'
+
+interface UserProfile {
+  name: string;
+  municipal_mayor: string;
+  address: string;
+}
 
 export default function ReportEntryPage() {
-  const [reportData, setReportData] = useState<CompleteReport[] | null>(null) // Changed to an array for multiple reports
+  const [reportData, setReportData] = useState<CompleteReport[] | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
+  const [exporting, setExporting] = useState<boolean>(false)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [selectedReportIndex, setSelectedReportIndex] = useState<number>(0)
+  const { user } = useAuth()
+  const router = useRouter()
 
   useEffect(() => {
-    const fetchReports = async () => {
-      setLoading(true) // Start loading
-      const data = await reportService.getUserReports() // Adjust this service call to fetch all reports
-      setReportData(data)
-      setLoading(false) // End loading
+    // Check if user is logged in and has user role only
+    const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+    if (!storedUser || storedUser.role !== "user") {
+      router.replace("/login");
+      return;
     }
 
+    const fetchUserProfile = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('name, municipal_mayor, address')
+          .eq('email', user?.email)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user profile:', error);
+          return;
+        }
+
+        if (data) {
+          setUserProfile(data);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    };
+
+    const fetchReports = async () => {
+      setLoading(true)
+      const data = await reportService.getUserReports()
+      setReportData(data)
+      setLoading(false)
+    }
+
+    fetchUserProfile();
     fetchReports()
-  }, [])
+  }, [router, user?.email])
 
-  if (loading) return <div className="p-4">Loading...</div>
+  const handleExportPDF = async (reportElement: HTMLElement, index: number) => {
+    const filename = `report-${reportData?.[index].reporting_period || 'report'}.pdf`
+    await exportToPDF(
+      reportElement,
+      filename,
+      () => setExporting(true),
+      () => setExporting(false)
+    )
+  }
 
-  if (!reportData || reportData.length === 0) return <div className="p-4">Failed to load or no reports available.</div>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  if (!reportData || reportData.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="bg-gray-50 rounded-lg p-8 text-center max-w-md">
+          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <h2 className="mt-4 text-xl font-semibold text-gray-900">No reports available</h2>
+          <p className="mt-2 text-gray-500">There are no reports to display at this time.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-center mb-4">Revised SPRPS Form 2003-1</h1>
-      
-      {reportData.map((report, idx) => (
-        <div key={idx}>
-          <div className="text-sm mb-2">
-            <div className="flex justify-between">
-              <span>Republic of the Philippines</span>
-              <span>Page 1 of __</span>
-            </div>
-            <div className="flex justify-between">
-              <span>{report.reporting_office}</span>
-              <span>{report.reporting_period}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Monthly Report</span>
-              <span>Reference Month / Year</span>
-            </div>
-            <div className="mb-4">Regional Office No. X</div>
-          </div>
+    <div className="max-w-7xl mx-auto px-4 py-6">
+      {/* Report Selection Header */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Monthly Reports</h1>
+          <p className="mt-1 text-sm text-gray-500">View and export your submitted reports</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <select
+            value={selectedReportIndex}
+            onChange={(e) => setSelectedReportIndex(Number(e.target.value))}
+            className="block w-full sm:w-80 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+          >
+            {reportData.map((report, idx) => (
+              <option key={idx} value={idx}>
+                {report.reporting_period} - {report.reporting_office}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => handleExportPDF(document.getElementById(`report-${selectedReportIndex}`)!, selectedReportIndex)}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span>{exporting ? 'Exporting...' : 'Export PDF'}</span>
+          </button>
+        </div>
+      </div>
 
-          <table className="w-full border border-collapse text-xs">
-            <thead className="bg-gray-200">
-              <tr>
-                <th className="border p-1">Program</th>
-                <th className="border p-1">Indicator</th>
-                <th className="border p-1">Previous</th>
-                <th className="border p-1">Current</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.entries && report.entries.length > 0 ? (
-                report.entries.map((entry, idx) => (
-                  <tr key={idx}>
-                    <td className="border p-1">{entry.program || ''}</td>
-                    <td className="border p-1">{entry.indicator}</td>
-                    <td className="border p-1 text-right">{entry.previous_report_period}</td>
-                    <td className="border p-1 text-right">{entry.current_period}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} className="border p-1 text-center">
-                    No entries available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-
-          <div className="mt-8">
-            <div>PREPARED BY: <strong>VANESSA MAE R. MORALES</strong></div>
-            <div className="mb-2">PESO MANAGER - Designate</div>
-            <div>APPROVED: <strong>HON. JENNIE ROSALIE UY - MENDEZ</strong></div>
-            <div>MUNICIPAL MAYOR</div>
-            <div className="mt-2 text-sm">Date: 14-Mar-25</div>
-          </div>
-
-          <div className="mt-6 text-xs italic">
-            Note: Include in the SPRS a simple LMI Analysis Report...
+      {/* Report Content */}
+      <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
+          <div className="text-center max-w-3xl mx-auto">
+            <h1 className="text-2xl font-bold">Department of Labor and Employment</h1>
+            <p className="text-lg mt-2 text-blue-100">Monthly Report on Implementation of Employment Programs</p>
+            <p className="text-sm text-blue-200 mt-1">Revised SPRPS Form 2003-1</p>
           </div>
         </div>
-      ))}
+
+        <div id={`report-${selectedReportIndex}`} className="p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+              <label className="block text-sm font-medium text-gray-500 mb-1">Reporting Period</label>
+              <div className="text-lg font-semibold text-gray-900">{reportData[selectedReportIndex].reporting_period}</div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+              <label className="block text-sm font-medium text-gray-500 mb-1">Reporting Office</label>
+              <div className="text-lg font-semibold text-gray-900">{reportData[selectedReportIndex].reporting_office}</div>
+            </div>
+          </div>
+
+          {/* Table Section */}
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="w-full min-w-[1200px] border-collapse bg-white">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-6 py-4 text-center border-r border-gray-200 text-sm font-semibold text-gray-900 w-[5%]">No.</th>
+                  <th className="px-6 py-4 text-left border-r border-gray-200 text-sm font-semibold text-gray-900 w-[8%]">KRA</th>
+                  <th className="px-6 py-4 text-left border-r border-gray-200 text-sm font-semibold text-gray-900 w-[20%]">PROGRAM</th>
+                  <th className="px-6 py-4 text-left border-r border-gray-200 text-sm font-semibold text-gray-900 w-[35%]">
+                    <div>INDICATOR</div>
+                    <div className="text-xs font-normal text-gray-500 mt-1">(OUTPUT SPECIFICATION)</div>
+                  </th>
+                  <th className="px-6 py-4 text-center border-r border-gray-200 text-sm font-semibold text-gray-900 w-[12%]">
+                    <div>PREVIOUS</div>
+                    <div className="font-normal text-gray-500">REPORTING PERIOD</div>
+                  </th>
+                  <th className="px-6 py-4 text-center border-r border-gray-200 text-sm font-semibold text-gray-900 w-[12%]">
+                    <div>CURRENT</div>
+                    <div className="font-normal text-gray-500">REPORTING PERIOD</div>
+                  </th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900 w-[8%]">REMARKS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {reportData[selectedReportIndex].entries && reportData[selectedReportIndex].entries.length > 0 ? (
+                  reportData[selectedReportIndex].entries.map((entry, entryIdx) => (
+                    <tr key={entryIdx} className={entryIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-6 py-4 border-r border-gray-200 text-center font-medium text-gray-900">{entryIdx + 1}</td>
+                      <td className="px-6 py-4 border-r border-gray-200 text-center text-gray-900">I</td>
+                      <td className="px-6 py-4 border-r border-gray-200">
+                        <div className="font-medium text-gray-900">{entry.program}</div>
+                      </td>
+                      <td className="px-6 py-4 border-r border-gray-200">
+                        <div className="space-y-1.5">
+                          <div className="font-medium text-gray-900">{entry.indicator}</div>
+                          {entry.sub_indicator && (
+                            <div className="text-sm text-gray-600">{entry.sub_indicator}</div>
+                          )}
+                          {entry.sub_sub_indicator && (
+                            <div className="text-sm text-gray-500">{entry.sub_sub_indicator}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 border-r border-gray-200 text-center">
+                        <span className="font-medium text-gray-900">{entry.previous_report_period}</span>
+                      </td>
+                      <td className="px-6 py-4 border-r border-gray-200 text-center">
+                        <span className="font-medium text-gray-900">{entry.current_period}</span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="text-gray-600">{entry.remarks || '-'}</span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500 bg-gray-50">
+                      <div className="flex flex-col items-center justify-center">
+                        <svg className="h-8 w-8 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p>No entries available</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer Section */}
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+              <div className="font-semibold text-gray-900 mb-2">PREPARED BY:</div>
+              <div className="text-gray-900 font-medium">{userProfile?.name || 'N/A'}</div>
+              <div className="text-sm text-gray-600 mt-1">PESO Staff</div>
+              <div className="text-sm text-gray-500 mt-1">{userProfile?.address || 'N/A'}</div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+              <div className="font-semibold text-gray-900 mb-2">APPROVED BY:</div>
+              <div className="text-gray-900 font-medium">HON. {userProfile?.municipal_mayor || 'N/A'}</div>
+              <div className="text-sm text-gray-600 mt-1">MUNICIPAL MAYOR</div>
+              <div className="text-sm text-gray-500 mt-1">{userProfile?.address || 'N/A'}</div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-sm text-gray-600 border-t border-gray-200 pt-6">
+            <div>
+              Date: {new Date().toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </div>
+            <div className="italic text-gray-500">
+              Note: Include in the SPRS a simple LMI Analysis Report...
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

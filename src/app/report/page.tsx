@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { reportService } from '@/services/reportService';
@@ -45,15 +45,24 @@ export default function ReportPage() {
     reportingOffice: ""
   });
 
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  useEffect(() => {
+    // Check if user is logged in and has user role only
+    const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+    if (!storedUser || storedUser.role !== "user") {
+      router.replace("/login");
+      return;
+    }
+  }, [router]);
 
   const validateForm = () => {
-    const newErrors: {[key: string]: string} = {};
-    
+    const newErrors: { [key: string]: string } = {};
+
     if (!formData.reportingPeriod) {
       newErrors.reportingPeriod = "Reporting period is required";
     }
-    
+
     if (!formData.reportingOffice) {
       newErrors.reportingOffice = "Reporting office is required";
     }
@@ -79,25 +88,25 @@ export default function ReportPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       toast.error('Please fix the validation errors before submitting');
       return;
     }
-  
+
     setLoading(true);
-  
+
     // Validate the `program` field for each entry
     const isValid = formData.employmentFacilitation.every(entry =>
       isValidProgram(entry.program)  // Validate the program
     );
-  
+
     if (!isValid) {
       toast.error('One or more programs are invalid.');
       setLoading(false);
       return;
     }
-  
+
     try {
       const result = await reportService.createReport(
         formData.reportingPeriod,
@@ -112,7 +121,7 @@ export default function ReportPage() {
           remarks: entry.remarks
         }))
       );
-  
+
       if (result) {
         toast.success('Report saved successfully');
         router.push('/reports'); // Redirect to reports list
@@ -126,21 +135,23 @@ export default function ReportPage() {
       setLoading(false);
     }
   };
-  
-// Validation function for ProgramType
-const isValidProgram = (program: string): program is ProgramType => {
-  return [
-    'JOB_VACANCIES',
-    'APPLICANTS_REGISTERED',
-    'PWD_PROJECTS',
-    'PWD_TRAINING',
-    'APPLICANTS_COUNSELLED',
-    'APPLICANTS_TESTED',
-    'CAREER_GUIDANCE',
-    'JOB_FAIR',
-    'LIVELIHOOD'
-  ].includes(program);
-};
+
+  // Validation function for ProgramType
+  const isValidProgram = (program: string): program is ProgramType => {
+    return [
+      'JOB_VACANCIES',
+      'APPLICANTS_REGISTERED',
+      'APPLICANTS_REFERRED',
+      'APPLICANTS_PLACED',
+      'PWD_PROJECTS',
+      'PWD_TRAINING',
+      'APPLICANTS_COUNSELLED',
+      'APPLICANTS_TESTED',
+      'CAREER_GUIDANCE',
+      'JOB_FAIR',
+      'LIVELIHOOD'
+    ].includes(program);
+  };
 
   const updateRow = <K extends keyof EmploymentFacilitationRow>(
     index: number,
@@ -156,6 +167,8 @@ const isValidProgram = (program: string): program is ProgramType => {
   const programOptions = [
     { value: "JOB_VACANCIES", label: "1. Job vacancies solicited/reported" },
     { value: "APPLICANTS_REGISTERED", label: "2. Applicants registered" },
+    { value: "APPLICANTS_REFERRED", label: "3. Applicants referred" },
+    { value: "APPLICANTS_PLACED", label: "4. Applicants placed" },
     { value: "PWD_PROJECTS", label: "5. Number of projects implemented for PWDs" },
     { value: "PWD_TRAINING", label: "6. Training conducted for PWDs" },
     { value: "APPLICANTS_COUNSELLED", label: "7. Total applicants counselled" },
@@ -182,6 +195,26 @@ const isValidProgram = (program: string): program is ProgramType => {
       { value: "OFWS", label: "2.6 Returning OFWs" },
       { value: "MIGRATORY", label: "2.7 Migratory Workers" },
       { value: "RURAL", label: "2.8 Rural Workers" }
+    ],
+    APPLICANTS_REFERRED: [
+      { value: "REGULAR_PROGRAM", label: "3.1 Regular Program" },
+      { value: "SPES", label: "3.2 SPES" },
+      { value: "WAP", label: "3.3 WAP" },
+      { value: "TULAY", label: "3.4 TULAY 2000" },
+      { value: "RETRENCHED", label: "3.5 Retrenched/Displaced Workers" },
+      { value: "OFWS", label: "3.6 Returning OFWs" },
+      { value: "MIGRATORY", label: "3.7 Migratory Workers" },
+      { value: "RURAL", label: "3.8 Rural Workers" }
+    ],
+    APPLICANTS_PLACED: [
+      { value: "REGULAR_PROGRAM", label: "4.1 Regular Program" },
+      { value: "SPES", label: "4.2 SPES" },
+      { value: "WAP", label: "4.3 WAP" },
+      { value: "TULAY", label: "4.4 TULAY 2000" },
+      { value: "RETRENCHED", label: "4.5 Retrenched/Displaced Workers" },
+      { value: "OFWS", label: "4.6 Returning OFWs" },
+      { value: "MIGRATORY", label: "4.7 Migratory Workers" },
+      { value: "RURAL", label: "4.8 Rural Workers" }
     ],
     PWD_PROJECTS: [
       { value: "BENEFICIARIES", label: "5.1 Beneficiaries" }
@@ -220,16 +253,32 @@ const isValidProgram = (program: string): program is ProgramType => {
       { value: "LOCAL_EMPLOYMENT", label: "1.1.1 Local employment" },
       { value: "OVERSEAS_EMPLOYMENT", label: "1.1.2 Overseas employment" }
     ],
+    REGULAR_PROGRAM_REFERRED: [
+      { value: "LOCAL_EMPLOYMENT", label: "3.1.1 Local Employment" },
+      { value: "OVERSEAS_EMPLOYMENT", label: "3.1.2 Overseas employment" },
+      { value: "SELF_EMPLOYMENT", label: "3.1.3 Self-employment" },
+      { value: "TRAINING", label: "3.1.4 Training" }
+    ],
     SPES: [
       { value: "PUBLIC_SECTOR", label: "1.2.1 Public Sector" },
       { value: "PRIVATE_SECTOR", label: "1.2.2 Private Sector" }
     ],
+    SPES_REFERRED: [
+      { value: "FEMALE", label: "3.2.1 Female" }
+    ],
     WAP: [
       { value: "FEMALE", label: "1.3.1 Female" }
+    ],
+    WAP_REFERRED: [
+      { value: "FEMALE", label: "3.3.1 Female" }
     ],
     TULAY: [
       { value: "WAGE_EMPLOYMENT", label: "1.4.1 Wage employment" },
       { value: "SELF_EMPLOYMENT", label: "1.4.2 Self-employment" }
+    ],
+    TULAY_REFERRED: [
+      { value: "WAGE_EMPLOYMENT", label: "3.4.1 Wage employment" },
+      { value: "SELF_EMPLOYMENT", label: "3.4.2 Self-employment" }
     ],
     // For Applicants Registered section
     REGULAR_PROGRAM_APPLICANTS: [
@@ -322,6 +371,89 @@ const isValidProgram = (program: string): program is ProgramType => {
     ],
     LRA_PLACED: [
       { value: "FEMALE", label: "10.8.5.1 Female" }
+    ],
+    RETRENCHED_REFERRED: [
+      { value: "FEMALE", label: "3.5.1 Female" }
+    ],
+    OFWS_REFERRED: [
+      { value: "FEMALE", label: "3.6.1 Female" }
+    ],
+    MIGRATORY_REFERRED: [
+      { value: "FEMALE", label: "3.7.1 Female" }
+    ],
+    RURAL_REFERRED: [
+      { value: "FEMALE", label: "3.8.1 Female" }
+    ],
+    LOCAL_EMPLOYMENT_REFERRED: [
+      { value: "FEMALE", label: "3.1.1.1 Female" }
+    ],
+    OVERSEAS_EMPLOYMENT_REFERRED: [
+      { value: "FEMALE", label: "3.1.2.1 Female" }
+    ],
+    SELF_EMPLOYMENT_REFERRED: [
+      { value: "FEMALE", label: "3.1.3.1 Female" }
+    ],
+    TRAINING_REFERRED: [
+      { value: "FEMALE", label: "3.1.4.1 Female" }
+    ],
+    WAGE_EMPLOYMENT_REFERRED: [
+      { value: "FEMALE", label: "3.4.1.1 Female" }
+    ],
+    SELF_EMPLOYMENT_TULAY_REFERRED: [
+      { value: "FEMALE", label: "3.4.2.1 Female" }
+    ],
+    REGULAR_PROGRAM_PLACED: [
+      { value: "LOCAL_EMPLOYMENT", label: "4.1.1 Local Employment" },
+      { value: "OVERSEAS_EMPLOYMENT", label: "4.1.2 Overseas employment" },
+      { value: "SELF_EMPLOYMENT", label: "4.1.3 Self-employment" },
+      { value: "TRAINING", label: "4.1.4 Training" }
+    ],
+    SPES_PLACED: [
+      { value: "PUBLIC_SECTOR", label: "4.2.1 Public Sector" },
+      { value: "PRIVATE_SECTOR", label: "4.2.2 Private Sector" }
+    ],
+    WAP_PLACED: [
+      { value: "FEMALE", label: "4.3.1 Female" }
+    ],
+    TULAY_PLACED: [
+      { value: "WAGE_EMPLOYMENT", label: "4.4.1 Wage employment" },
+      { value: "SELF_EMPLOYMENT", label: "4.4.2 Self-employment" }
+    ],
+    RETRENCHED_PLACED: [
+      { value: "FEMALE", label: "4.5.1 Female" }
+    ],
+    OFWS_PLACED: [
+      { value: "FEMALE", label: "4.6.1 Female" }
+    ],
+    MIGRATORY_PLACED: [
+      { value: "FEMALE", label: "4.7.1 Female" }
+    ],
+    RURAL_PLACED: [
+      { value: "FEMALE", label: "4.8.1 Female" }
+    ],
+    LOCAL_EMPLOYMENT_PLACED: [
+      { value: "FEMALE", label: "4.1.1.1 Female" }
+    ],
+    OVERSEAS_EMPLOYMENT_PLACED: [
+      { value: "FEMALE", label: "4.1.2.1 Female" }
+    ],
+    SELF_EMPLOYMENT_PLACED: [
+      { value: "FEMALE", label: "4.1.3.1 Female" }
+    ],
+    TRAINING_PLACED: [
+      { value: "FEMALE", label: "4.1.4.1 Female" }
+    ],
+    PUBLIC_SECTOR_PLACED: [
+      { value: "FEMALE", label: "4.2.1.1 Female" }
+    ],
+    PRIVATE_SECTOR_PLACED: [
+      { value: "FEMALE", label: "4.2.2.1 Female" }
+    ],
+    WAGE_EMPLOYMENT_PLACED: [
+      { value: "FEMALE", label: "4.4.1.1 Female" }
+    ],
+    SELF_EMPLOYMENT_TULAY_PLACED: [
+      { value: "FEMALE", label: "4.4.2.1 Female" }
     ]
   };
 
@@ -367,7 +499,7 @@ const isValidProgram = (program: string): program is ProgramType => {
               type="month"
               className="w-full p-2 border rounded dark:bg-gray-700"
               value={formData.reportingPeriod}
-              onChange={(e) => setFormData({...formData, reportingPeriod: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, reportingPeriod: e.target.value })}
             />
             {errors.reportingPeriod && (
               <p className="text-red-500 text-sm mt-1">{errors.reportingPeriod}</p>
@@ -379,7 +511,7 @@ const isValidProgram = (program: string): program is ProgramType => {
               type="text"
               className="w-full p-2 border rounded dark:bg-gray-700"
               value={formData.reportingOffice}
-              onChange={(e) => setFormData({...formData, reportingOffice: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, reportingOffice: e.target.value })}
             />
             {errors.reportingOffice && (
               <p className="text-red-500 text-sm mt-1">{errors.reportingOffice}</p>
@@ -428,9 +560,8 @@ const isValidProgram = (program: string): program is ProgramType => {
                     <td className="px-4 py-2 border">
                       <div className="relative">
                         <select
-                          className={`w-full p-2 border rounded dark:bg-gray-700 text-sm appearance-none ${
-                            errors[`row${index}_program`] ? 'border-red-500' : ''
-                          }`}
+                          className={`w-full p-2 border rounded dark:bg-gray-700 text-sm appearance-none ${errors[`row${index}_program`] ? 'border-red-500' : ''
+                            }`}
                           value={row.program}
                           onChange={(e) => {
                             updateRow(index, "program", e.target.value);
@@ -447,7 +578,7 @@ const isValidProgram = (program: string): program is ProgramType => {
                         </select>
                         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                           <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                            <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/>
+                            <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
                           </svg>
                         </div>
                       </div>
@@ -459,9 +590,8 @@ const isValidProgram = (program: string): program is ProgramType => {
                       <div className="space-y-2">
                         <div className="relative">
                           <select
-                            className={`w-full p-2 border rounded dark:bg-gray-700 text-sm appearance-none ${
-                              errors[`row${index}_indicator`] ? 'border-red-500' : ''
-                            }`}
+                            className={`w-full p-2 border rounded dark:bg-gray-700 text-sm appearance-none ${errors[`row${index}_indicator`] ? 'border-red-500' : ''
+                              }`}
                             value={row.indicator}
                             onChange={(e) => {
                               updateRow(index, "indicator", e.target.value);
@@ -477,7 +607,7 @@ const isValidProgram = (program: string): program is ProgramType => {
                           </select>
                           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                             <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                              <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/>
+                              <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
                             </svg>
                           </div>
                         </div>
@@ -497,7 +627,7 @@ const isValidProgram = (program: string): program is ProgramType => {
                             </select>
                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                               <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/>
+                                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
                               </svg>
                             </div>
                           </div>
@@ -508,9 +638,8 @@ const isValidProgram = (program: string): program is ProgramType => {
                       <input
                         type="number"
                         min="0"
-                        className={`w-full p-2 border rounded text-center dark:bg-gray-700 ${
-                          errors[`row${index}_previous`] ? 'border-red-500' : ''
-                        }`}
+                        className={`w-full p-2 border rounded text-center dark:bg-gray-700 ${errors[`row${index}_previous`] ? 'border-red-500' : ''
+                          }`}
                         value={row.previousReportPeriod}
                         onChange={(e) => updateRow(index, "previousReportPeriod", parseInt(e.target.value) || 0)}
                       />
@@ -519,9 +648,8 @@ const isValidProgram = (program: string): program is ProgramType => {
                       <input
                         type="number"
                         min="0"
-                        className={`w-full p-2 border rounded text-center dark:bg-gray-700 ${
-                          errors[`row${index}_current`] ? 'border-red-500' : ''
-                        }`}
+                        className={`w-full p-2 border rounded text-center dark:bg-gray-700 ${errors[`row${index}_current`] ? 'border-red-500' : ''
+                          }`}
                         value={row.currentPeriod}
                         onChange={(e) => updateRow(index, "currentPeriod", parseInt(e.target.value) || 0)}
                       />
@@ -575,9 +703,8 @@ const isValidProgram = (program: string): program is ProgramType => {
           </button>
           <button
             type="submit"
-            className={`px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center ${
-              loading ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
+            className={`px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center ${loading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             disabled={loading}
           >
             {loading ? (
