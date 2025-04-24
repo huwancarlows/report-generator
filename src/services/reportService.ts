@@ -8,7 +8,7 @@ export const reportService = {
     entries: Omit<EmploymentFacilitation, 'id' | 'report_id' | 'created_at' | 'updated_at'>[]
   ): Promise<CompleteReport | null> {
     try {
-      // Get user from localStorage instead of Supabase session
+      // Get user from localStorage
       const storedUser = localStorage.getItem("user");
       if (!storedUser) {
         console.error('No authenticated user found');
@@ -16,20 +16,8 @@ export const reportService = {
       }
 
       const user = JSON.parse(storedUser);
-      if (!user?.id || !user?.email) {
+      if (!user?.id) {
         console.error('Invalid user data');
-        return null;
-      }
-
-      // Fetch user profile data
-      const { data: userProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('name, municipal_mayor, address')
-        .eq('email', user.email)
-        .single();
-
-      if (profileError) {
-        console.error('Error fetching user profile:', profileError);
         return null;
       }
 
@@ -55,9 +43,7 @@ export const reportService = {
           current_period: entry.current_period,
           remarks: entry.remarks,
         })),
-        user_name: userProfile.name,
-        municipal_mayor: userProfile.municipal_mayor,
-        office_address: userProfile.address
+        profile_id: user.id // Use the user's ID directly
       });
 
       if (rpcError) {
@@ -65,12 +51,13 @@ export const reportService = {
         return handleSupabaseError<null>(rpcError, null);
       }
 
-      // Optionally fetch the latest report to return
+      // Fetch the latest report
       const { data: recentReports, error: fetchError } = await supabase
         .from("employment_reports")
         .select("*, employment_facilitation_entries(*)")
         .eq("reporting_period", reportingPeriod)
         .eq("reporting_office", reportingOffice)
+        .eq("profile_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -136,10 +123,24 @@ export const reportService = {
 
   async getUserReports(): Promise<CompleteReport[]> {
     try {
-      // First get the reports
+      // Get user from localStorage
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) {
+        console.error('No authenticated user found');
+        return [];
+      }
+
+      const user = JSON.parse(storedUser);
+      if (!user?.id) {
+        console.error('Invalid user data');
+        return [];
+      }
+
+      // Get reports for the current user
       const { data: reports, error: reportsError } = await supabase
         .from('employment_reports')
         .select('*')
+        .eq('profile_id', user.id)
         .order('created_at', { ascending: false });
 
       if (reportsError) {
@@ -151,7 +152,7 @@ export const reportService = {
         return [];
       }
 
-      // Then get all entries for these reports
+      // Get entries for these reports
       const reportIds = reports.map(report => report.id);
       const { data: entries, error: entriesError } = await supabase
         .from('employment_facilitation_entries')
@@ -163,7 +164,6 @@ export const reportService = {
         return [];
       }
 
-      // Combine reports with their entries
       return reports.map(report => ({
         ...report,
         entries: entries?.filter(entry => entry.report_id === report.id) || []

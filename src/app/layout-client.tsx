@@ -11,9 +11,10 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Don't show sidebar on login page
+  // Don't show sidebar on login page or home page
   const isLoginPage = pathname === "/login";
-  const shouldShowSidebar = user && !isLoginPage;
+  const isHomePage = pathname === "/";
+  const shouldShowSidebar = user && !isLoginPage && !isHomePage;
 
   if (loading) {
     return (
@@ -37,13 +38,12 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
           }`}
       >
         {shouldShowSidebar && (
-          <header className="sticky top-0 z-30 bg-white dark:bg-gray-800 shadow-sm">
-            <div className={`flex items-center justify-between max-w-7xl mx-auto px-6 py-4 ${shouldShowSidebar ? 'ml-16 sm:ml-0' : ''
-              }`}>
+          <header className="sticky top-0 z-30 bg-white dark:bg-gray-800 shadow-sm w-full">
+            <div className={`flex items-center justify-between px-6 py-4 ${shouldShowSidebar ? 'ml-16 sm:ml-0' : ''} ${isSidebarOpen ? 'mr-0' : ''}`}>
               <div className="flex items-center space-x-4">
                 <div className="relative w-10 h-10">
                   <Image
-                    src="/images/dole-logo.png"
+                    src="/dole-logo.png"
                     alt="DOLE Logo"
                     fill
                     className="object-contain"
@@ -77,7 +77,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
             </div>
           </header>
         )}
-        <div className={`p-6 ${shouldShowSidebar ? 'ml-16 sm:ml-0' : ''}`}>
+        <div className={`${shouldShowSidebar ? 'p-6 ml-16 sm:ml-0' : ''}`}>
           {children}
         </div>
       </main>

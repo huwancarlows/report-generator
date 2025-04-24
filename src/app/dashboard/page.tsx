@@ -46,44 +46,53 @@ export default function DashboardPage() {
       const chartRef = chartRefs[chartName as keyof typeof chartRefs];
       if (chartRef.current) {
         const clone = chartRef.current.cloneNode(true) as HTMLElement;
-        document.body.appendChild(clone);
-        clone.style.position = 'absolute';
-        clone.style.left = '-9999px';
+
+        // Set up the clone for export
+        clone.style.position = 'fixed';
+        clone.style.top = '0';
+        clone.style.left = '0';
+        clone.style.width = '1200px'; // Fixed width for consistent exports
         clone.style.backgroundColor = '#ffffff';
-        clone.style.padding = '20px';
+        clone.style.padding = '32px';
+        clone.style.borderRadius = '0';
+        clone.style.border = 'none';
+        document.body.appendChild(clone);
 
-        // Remove all Tailwind classes and set basic styles
-        const elements = clone.querySelectorAll('*');
-        elements.forEach(element => {
-          const el = element as HTMLElement;
-          el.className = ''; // Remove all classes
-          el.style.backgroundColor = '#ffffff';
-          el.style.color = '#000000';
-          el.style.borderColor = '#000000';
-        });
+        // Style adjustments for export
+        const title = clone.querySelector('h2');
+        if (title) {
+          title.style.fontSize = '24px';
+          title.style.marginBottom = '24px';
+          title.style.color = '#111827';
+        }
 
-        // Ensure canvas is visible
         const canvas = clone.querySelector('canvas');
         if (canvas) {
-          canvas.style.display = 'block';
           canvas.style.width = '100%';
-          canvas.style.height = 'auto';
+          canvas.style.height = '500px'; // Fixed height for consistent exports
+        }
+
+        // Remove export button from clone
+        const exportButton = clone.querySelector('button');
+        if (exportButton) {
+          exportButton.remove();
         }
 
         const exportCanvas = await html2canvas(clone, {
-          scale: 2,
+          scale: 2, // Higher scale for better quality
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
           allowTaint: true,
-          foreignObjectRendering: true
+          width: 1200,
+          height: 600,
         });
 
         document.body.removeChild(clone);
 
         const link = document.createElement('a');
-        link.download = `${chartName}-report.png`;
-        link.href = exportCanvas.toDataURL('image/png');
+        link.download = `${chartName}-report-${new Date().toISOString().split('T')[0]}.png`;
+        link.href = exportCanvas.toDataURL('image/png', 1.0);
         link.click();
       }
     } catch (error) {
@@ -187,212 +196,227 @@ export default function DashboardPage() {
     }]
   };
 
+  // Update chart options for better visualization
+  const commonChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+        labels: {
+          padding: 20,
+          font: {
+            size: 14,
+            weight: 'bold' as const,
+          },
+          usePointStyle: true,
+          pointStyle: 'circle',
+        },
+      },
+      title: {
+        display: false,
+      },
+    },
+  };
+
+  const lineChartOptions = {
+    ...commonChartOptions,
+    scales: {
+      x: {
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)',
+          drawBorder: false,
+        },
+        ticks: {
+          font: {
+            size: 12,
+            weight: 'bold' as const,
+          },
+        },
+      },
+      y: {
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)',
+          drawBorder: false,
+        },
+        ticks: {
+          font: {
+            size: 12,
+            weight: 'bold' as const,
+          },
+        },
+      },
+    },
+  };
+
+  const barChartOptions = {
+    ...commonChartOptions,
+    indexAxis: 'y' as const,
+    scales: {
+      x: {
+        grid: {
+          display: false,
+        },
+        ticks: {
+          font: {
+            size: 12,
+            weight: 'bold' as const,
+          },
+        },
+      },
+      y: {
+        grid: {
+          display: false,
+        },
+        ticks: {
+          font: {
+            size: 12,
+            weight: 'bold' as const,
+          },
+        },
+      },
+    },
+  };
+
+  const pieChartOptions = {
+    ...commonChartOptions,
+    plugins: {
+      ...commonChartOptions.plugins,
+      legend: {
+        ...commonChartOptions.plugins.legend,
+        position: 'right' as const,
+      },
+    },
+  };
+
   return (
-    <div className="p-6 space-y-8 min-h-screen bg-white">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-black">Employment Dashboard</h1>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-[1400px] mx-auto px-6">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">DOLE Employment Dashboard</h1>
+          <p className="mt-2 text-gray-600">Comprehensive overview of employment statistics and trends</p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8">
+          {/* Cumulative Performance */}
+          <section ref={chartRefs.performance} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">CUMULATIVE PERFORMANCE OF THE 26 PESO</h2>
+              <button
+                onClick={() => handleExport('performance')}
+                disabled={isExporting}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+              >
+                {isExporting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export Chart
+                  </>
+                )}
+              </button>
+            </div>
+            <div className="h-[400px]">
+              <Line data={monthlyData} options={lineChartOptions} />
+            </div>
+          </section>
+
+          {/* Top 10 Available Jobs */}
+          <section ref={chartRefs.jobs} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Top 10 Available Jobs</h2>
+              <button
+                onClick={() => handleExport('jobs')}
+                disabled={isExporting}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+              >
+                {isExporting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export Chart
+                  </>
+                )}
+              </button>
+            </div>
+            <div className="h-[400px]">
+              <Bar data={topJobsData} options={barChartOptions} />
+            </div>
+          </section>
+
+          {/* Statistics Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Gender Distribution */}
+            <section ref={chartRefs.gender} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Gender Distribution</h2>
+                <button
+                  onClick={() => handleExport('gender')}
+                  disabled={isExporting}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+                >
+                  {isExporting ? 'Exporting...' : 'Export Chart'}
+                </button>
+              </div>
+              <div className="h-[300px]">
+                <Pie data={genderData} options={pieChartOptions} />
+              </div>
+            </section>
+
+            {/* Educational Attainment */}
+            <section ref={chartRefs.education} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Educational Attainment</h2>
+                <button
+                  onClick={() => handleExport('education')}
+                  disabled={isExporting}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+                >
+                  {isExporting ? 'Exporting...' : 'Export Chart'}
+                </button>
+              </div>
+              <div className="h-[300px]">
+                <Pie data={educationData} options={pieChartOptions} />
+              </div>
+            </section>
+
+            {/* Sector Distribution */}
+            <section ref={chartRefs.sector} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Sector Distribution</h2>
+                <button
+                  onClick={() => handleExport('sector')}
+                  disabled={isExporting}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+                >
+                  {isExporting ? 'Exporting...' : 'Export Chart'}
+                </button>
+              </div>
+              <div className="h-[300px]">
+                <Pie data={sectorData} options={pieChartOptions} />
+              </div>
+            </section>
+          </div>
+        </div>
       </div>
-
-      {/* Cumulative Performance */}
-      <section ref={chartRefs.performance} className="bg-white rounded-lg p-6 shadow border border-gray-300">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-black">CUMULATIVE PERFORMANCE OF THE 26 PESO</h2>
-          <button
-            onClick={() => handleExport('performance')}
-            disabled={isExporting}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
-          >
-            {isExporting ? 'Exporting...' : 'Export Chart'}
-          </button>
-        </div>
-        <div className="h-80">
-          <Line
-            data={monthlyData}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  position: 'top',
-                  labels: {
-                    color: '#000000',
-                    font: {
-                      size: 12
-                    }
-                  }
-                },
-              },
-              scales: {
-                x: {
-                  grid: {
-                    color: 'rgba(0, 0, 0, 0.1)'
-                  },
-                  ticks: {
-                    color: '#000000'
-                  }
-                },
-                y: {
-                  grid: {
-                    color: 'rgba(0, 0, 0, 0.1)'
-                  },
-                  ticks: {
-                    color: '#000000'
-                  }
-                }
-              }
-            }}
-          />
-        </div>
-      </section>
-
-      {/* Top 10 Available Jobs */}
-      <section ref={chartRefs.jobs} className="bg-white rounded-lg p-6 shadow border border-gray-300">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-black">Top 10 Available Jobs</h2>
-          <button
-            onClick={() => handleExport('jobs')}
-            disabled={isExporting}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
-          >
-            {isExporting ? 'Exporting...' : 'Export Chart'}
-          </button>
-        </div>
-        <div className="h-80">
-          <Bar
-            data={topJobsData}
-            options={{
-              indexAxis: 'y',
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  display: false
-                },
-              },
-              scales: {
-                x: {
-                  grid: {
-                    color: 'rgba(0, 0, 0, 0.1)'
-                  },
-                  ticks: {
-                    color: '#000000'
-                  }
-                },
-                y: {
-                  grid: {
-                    color: 'rgba(0, 0, 0, 0.1)'
-                  },
-                  ticks: {
-                    color: '#000000'
-                  }
-                }
-              }
-            }}
-          />
-        </div>
-      </section>
-
-      {/* Gender Distribution */}
-      <section ref={chartRefs.gender} className="bg-white rounded-lg p-6 shadow border border-gray-300">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-black">Gender of Registered Applicants</h2>
-          <button
-            onClick={() => handleExport('gender')}
-            disabled={isExporting}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
-          >
-            {isExporting ? 'Exporting...' : 'Export Chart'}
-          </button>
-        </div>
-        <div className="h-80">
-          <Pie
-            data={genderData}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  position: 'right',
-                  labels: {
-                    color: '#000000',
-                    font: {
-                      size: 12
-                    }
-                  }
-                },
-              },
-            }}
-          />
-        </div>
-      </section>
-
-      {/* Educational Attainment */}
-      <section ref={chartRefs.education} className="bg-white rounded-lg p-6 shadow border border-gray-300">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-black">Applicants by Educational Attainment</h2>
-          <button
-            onClick={() => handleExport('education')}
-            disabled={isExporting}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
-          >
-            {isExporting ? 'Exporting...' : 'Export Chart'}
-          </button>
-        </div>
-        <div className="h-80">
-          <Pie
-            data={educationData}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  position: 'right',
-                  labels: {
-                    color: '#000000',
-                    font: {
-                      size: 12
-                    }
-                  }
-                },
-              },
-            }}
-          />
-        </div>
-      </section>
-
-      {/* Placement in Private vs Government */}
-      <section ref={chartRefs.sector} className="bg-white rounded-lg p-6 shadow border border-gray-300">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-black">Placed Applicants in Private vs Government Sector</h2>
-          <button
-            onClick={() => handleExport('sector')}
-            disabled={isExporting}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
-          >
-            {isExporting ? 'Exporting...' : 'Export Chart'}
-          </button>
-        </div>
-        <div className="h-80">
-          <Pie
-            data={sectorData}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  position: 'right',
-                  labels: {
-                    color: '#000000',
-                    font: {
-                      size: 12
-                    }
-                  }
-                },
-              },
-            }}
-          />
-        </div>
-      </section>
     </div>
   );
 }

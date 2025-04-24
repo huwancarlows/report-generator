@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 type User = {
   id: number;
   email: string;
-  role: string;
+  role: 'admin' | 'user';
+  name: string;
+  municipal_mayor: string;
+  address: string;
 };
 
 type AuthContextType = {
@@ -21,8 +24,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   role: null,
   loading: true,
-  login: () => {},
-  logout: () => {},
+  login: () => { },
+  logout: () => { },
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {

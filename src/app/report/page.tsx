@@ -8,12 +8,12 @@ import { toast } from 'react-hot-toast';
 import { ProgramType } from "@/types/database.types";
 
 type EmploymentFacilitationRow = {
-  program: string;
+  program: ProgramType;
   indicator: string;
-  subIndicator?: string;
-  subSubIndicator?: string;
-  previousReportPeriod: number;
-  currentPeriod: number;
+  sub_indicator?: string;
+  sub_sub_indicator?: string;
+  previous_report_period: number;
+  current_period: number;
   remarks?: string;
 };
 
@@ -25,6 +25,15 @@ interface ReportData {
 
 type FieldType<T, K extends keyof T> = T[K];
 
+type IndicatorOption = {
+  value: string;
+  label: string;
+};
+
+type IndicatorOptionsMap = {
+  [key: string]: IndicatorOption[];
+};
+
 export default function ReportPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -32,12 +41,12 @@ export default function ReportPage() {
   const [formData, setFormData] = useState<ReportData>({
     employmentFacilitation: [
       {
-        program: "JOB_VACANCIES",
+        program: "JOB_VACANCIES" as ProgramType,
         indicator: "REGULAR_PROGRAM",
-        subIndicator: "LOCAL_EMPLOYMENT",
-        subSubIndicator: "FEMALE",
-        previousReportPeriod: 0,
-        currentPeriod: 0,
+        sub_indicator: "LOCAL_EMPLOYMENT",
+        sub_sub_indicator: "FEMALE",
+        previous_report_period: 0,
+        current_period: 0,
         remarks: ""
       }
     ],
@@ -54,6 +63,12 @@ export default function ReportPage() {
       router.replace("/login");
       return;
     }
+
+    // Set the reporting office from user's address
+    setFormData(prev => ({
+      ...prev,
+      reportingOffice: storedUser.address || ""
+    }));
   }, [router]);
 
   const validateForm = () => {
@@ -74,10 +89,10 @@ export default function ReportPage() {
       if (!row.indicator) {
         newErrors[`row${index}_indicator`] = "Indicator is required";
       }
-      if (row.previousReportPeriod < 0) {
+      if (row.previous_report_period < 0) {
         newErrors[`row${index}_previous`] = "Value cannot be negative";
       }
-      if (row.currentPeriod < 0) {
+      if (row.current_period < 0) {
         newErrors[`row${index}_current`] = "Value cannot be negative";
       }
     });
@@ -112,12 +127,12 @@ export default function ReportPage() {
         formData.reportingPeriod,
         formData.reportingOffice,
         formData.employmentFacilitation.map(entry => ({
-          program: entry.program as ProgramType,  // Cast program to ProgramType
+          program: entry.program,
           indicator: entry.indicator,
-          sub_indicator: entry.subIndicator,
-          sub_sub_indicator: entry.subSubIndicator,
-          previous_report_period: entry.previousReportPeriod,
-          current_period: entry.currentPeriod,
+          sub_indicator: entry.sub_indicator,
+          sub_sub_indicator: entry.sub_sub_indicator,
+          previous_report_period: entry.previous_report_period,
+          current_period: entry.current_period,
           remarks: entry.remarks
         }))
       );
@@ -160,6 +175,19 @@ export default function ReportPage() {
   ) => {
     const newData = { ...formData };
     newData.employmentFacilitation[index][field] = value;
+
+    // Reset dependent fields when parent field changes
+    if (field === "program") {
+      newData.employmentFacilitation[index].indicator = "";
+      newData.employmentFacilitation[index].sub_indicator = "";
+      newData.employmentFacilitation[index].sub_sub_indicator = "";
+    } else if (field === "indicator") {
+      newData.employmentFacilitation[index].sub_indicator = "";
+      newData.employmentFacilitation[index].sub_sub_indicator = "";
+    } else if (field === "sub_indicator") {
+      newData.employmentFacilitation[index].sub_sub_indicator = "";
+    }
+
     setFormData(newData);
   };
 
@@ -179,7 +207,7 @@ export default function ReportPage() {
   ];
 
   // Indicator options based on the DOLE form
-  const indicatorOptions = {
+  const indicatorOptions: IndicatorOptionsMap = {
     JOB_VACANCIES: [
       { value: "REGULAR_PROGRAM", label: "1.1 Regular Program" },
       { value: "SPES", label: "1.2 SPES" },
@@ -197,46 +225,46 @@ export default function ReportPage() {
       { value: "RURAL", label: "2.8 Rural Workers" }
     ],
     APPLICANTS_REFERRED: [
-      { value: "REGULAR_PROGRAM", label: "3.1 Regular Program" },
-      { value: "SPES", label: "3.2 SPES" },
-      { value: "WAP", label: "3.3 WAP" },
-      { value: "TULAY", label: "3.4 TULAY 2000" },
-      { value: "RETRENCHED", label: "3.5 Retrenched/Displaced Workers" },
-      { value: "OFWS", label: "3.6 Returning OFWs" },
-      { value: "MIGRATORY", label: "3.7 Migratory Workers" },
-      { value: "RURAL", label: "3.8 Rural Workers" }
+      { value: "REGULAR_PROGRAM_REFERRED", label: "3.1 Regular Program" },
+      { value: "SPES_REFERRED", label: "3.2 SPES" },
+      { value: "WAP_REFERRED", label: "3.3 WAP" },
+      { value: "TULAY_REFERRED", label: "3.4 TULAY 2000" },
+      { value: "RETRENCHED_REFERRED", label: "3.5 Retrenched/Displaced Workers" },
+      { value: "OFWS_REFERRED", label: "3.6 Returning OFWs" },
+      { value: "MIGRATORY_REFERRED", label: "3.7 Migratory Workers" },
+      { value: "RURAL_REFERRED", label: "3.8 Rural Workers" }
     ],
     APPLICANTS_PLACED: [
-      { value: "REGULAR_PROGRAM", label: "4.1 Regular Program" },
-      { value: "SPES", label: "4.2 SPES" },
-      { value: "WAP", label: "4.3 WAP" },
-      { value: "TULAY", label: "4.4 TULAY 2000" },
-      { value: "RETRENCHED", label: "4.5 Retrenched/Displaced Workers" },
-      { value: "OFWS", label: "4.6 Returning OFWs" },
-      { value: "MIGRATORY", label: "4.7 Migratory Workers" },
-      { value: "RURAL", label: "4.8 Rural Workers" }
+      { value: "REGULAR_PROGRAM_PLACED", label: "4.1 Regular Program" },
+      { value: "SPES_PLACED", label: "4.2 SPES" },
+      { value: "WAP_PLACED", label: "4.3 WAP" },
+      { value: "TULAY_PLACED", label: "4.4 TULAY 2000" },
+      { value: "RETRENCHED_PLACED", label: "4.5 Retrenched/Displaced Workers" },
+      { value: "OFWS_PLACED", label: "4.6 Returning OFWs" },
+      { value: "MIGRATORY_PLACED", label: "4.7 Migratory Workers" },
+      { value: "RURAL_PLACED", label: "4.8 Rural Workers" }
     ],
     PWD_PROJECTS: [
-      { value: "BENEFICIARIES", label: "5.1 Beneficiaries" }
+      { value: "BENEFICIARIES_PWD", label: "5.1 Beneficiaries" }
     ],
     PWD_TRAINING: [
-      { value: "BENEFICIARIES", label: "6.1 Beneficiaries" }
+      { value: "BENEFICIARIES_TRAINING", label: "6.1 Beneficiaries" }
     ],
     APPLICANTS_COUNSELLED: [
-      { value: "TOTAL", label: "7. Total applicants counselled" }
+      { value: "TOTAL_COUNSELLED", label: "7. Total applicants counselled" }
     ],
     APPLICANTS_TESTED: [
-      { value: "TOTAL", label: "8. Total applicants tested" }
+      { value: "TOTAL_TESTED", label: "8. Total applicants tested" }
     ],
     CAREER_GUIDANCE: [
       { value: "STUDENTS", label: "9.1 Students given Career Guidance" },
       { value: "INSTITUTIONS", label: "9.2 Schools/Colleges/Universities" }
     ],
     JOB_FAIR: [
-      { value: "CONDUCTED", label: "10.1 Jobs fair conducted/assisted" },
-      { value: "TYPES", label: "10.2 Types" },
-      { value: "VACANCIES", label: "10.3 Job vacancies solicited" },
-      { value: "APPLICANTS", label: "10.4 Job applicants registered" },
+      { value: "JOBS_FAIR_CONDUCTED", label: "10.1 Jobs fair conducted/assisted" },
+      { value: "JOBS_FAIR_TYPES", label: "10.2 Types" },
+      { value: "JOB_VACANCIES_FAIR", label: "10.3 Job vacancies solicited" },
+      { value: "JOB_APPLICANTS_FAIR", label: "10.4 Job applicants registered" },
       { value: "HIRED_ON_SPOT", label: "10.5 Job applicants hired on the spot" },
       { value: "REPORTED_PLACED", label: "10.6 Job applicants reported placed" },
       { value: "PRAS_ASSISTED", label: "10.7 PRAS assisted" },
@@ -248,16 +276,16 @@ export default function ReportPage() {
   };
 
   // Sub-indicator options
-  const subIndicatorOptions = {
+  const subIndicatorOptions: IndicatorOptionsMap = {
     REGULAR_PROGRAM: [
       { value: "LOCAL_EMPLOYMENT", label: "1.1.1 Local employment" },
       { value: "OVERSEAS_EMPLOYMENT", label: "1.1.2 Overseas employment" }
     ],
     REGULAR_PROGRAM_REFERRED: [
-      { value: "LOCAL_EMPLOYMENT", label: "3.1.1 Local Employment" },
-      { value: "OVERSEAS_EMPLOYMENT", label: "3.1.2 Overseas employment" },
-      { value: "SELF_EMPLOYMENT", label: "3.1.3 Self-employment" },
-      { value: "TRAINING", label: "3.1.4 Training" }
+      { value: "LOCAL_EMPLOYMENT_REFERRED", label: "3.1.1 Local Employment" },
+      { value: "OVERSEAS_EMPLOYMENT_REFERRED", label: "3.1.2 Overseas employment" },
+      { value: "SELF_EMPLOYMENT_REFERRED", label: "3.1.3 Self-employment" },
+      { value: "TRAINING_REFERRED", label: "3.1.4 Training" }
     ],
     SPES: [
       { value: "PUBLIC_SECTOR", label: "1.2.1 Public Sector" },
@@ -277,8 +305,8 @@ export default function ReportPage() {
       { value: "SELF_EMPLOYMENT", label: "1.4.2 Self-employment" }
     ],
     TULAY_REFERRED: [
-      { value: "WAGE_EMPLOYMENT", label: "3.4.1 Wage employment" },
-      { value: "SELF_EMPLOYMENT", label: "3.4.2 Self-employment" }
+      { value: "WAGE_EMPLOYMENT_REFERRED", label: "3.4.1 Wage employment" },
+      { value: "SELF_EMPLOYMENT_TULAY_REFERRED", label: "3.4.2 Self-employment" }
     ],
     // For Applicants Registered section
     REGULAR_PROGRAM_APPLICANTS: [
@@ -306,7 +334,7 @@ export default function ReportPage() {
     RURAL: [
       { value: "FEMALE", label: "2.8.1 Female" }
     ],
-    BENEFICIARIES: [
+    BENEFICIARIES_PWD: [
       { value: "FEMALE", label: "5.1.1 Female" }
     ],
     PWD_TRAINING_BENEFICIARIES: [
@@ -323,45 +351,45 @@ export default function ReportPage() {
       { value: "BOTH", label: "10.2.3 Local and Overseas employment" },
       { value: "PWD", label: "10.2.4 PWDs and other disadvantaged groups" }
     ],
-    JOB_VACANCIES: [
+    JOB_VACANCIES_FAIR: [
       { value: "LOCAL", label: "10.3.1 Local employment" },
       { value: "OVERSEAS", label: "10.3.2 Overseas employment" },
       { value: "BOTH", label: "10.3.3 Local and Overseas employment" },
       { value: "PWD", label: "10.3.4 PWDs and other disadvantaged groups" }
     ],
-    JOB_APPLICANTS: [
-      { value: "LOCAL", label: "10.4.1 Local employment" },
-      { value: "OVERSEAS", label: "10.4.2 Overseas employment" },
-      { value: "BOTH", label: "10.4.3 Local and Overseas employment" },
-      { value: "PWD", label: "10.4.4 PWDs and other disadvantaged groups" }
+    JOB_APPLICANTS_FAIR: [
+      { value: "LOCAL_APPLICANTS", label: "10.4.1 Local employment" },
+      { value: "OVERSEAS_APPLICANTS", label: "10.4.2 Overseas employment" },
+      { value: "BOTH_APPLICANTS", label: "10.4.3 Local and Overseas employment" },
+      { value: "PWD_APPLICANTS", label: "10.4.4 PWDs and other disadvantaged groups" }
     ],
     HIRED_ON_SPOT: [
-      { value: "LOCAL", label: "10.5.1 Local employment" },
-      { value: "OVERSEAS", label: "10.5.2 Overseas employment" },
-      { value: "BOTH", label: "10.5.3 Local and Overseas employment" },
-      { value: "PWD", label: "10.5.4 PWDs and other disadvantaged groups" }
+      { value: "LOCAL_HIRED", label: "10.5.1 Local employment" },
+      { value: "OVERSEAS_HIRED", label: "10.5.2 Overseas employment" },
+      { value: "BOTH_HIRED", label: "10.5.3 Local and Overseas employment" },
+      { value: "PWD_HIRED", label: "10.5.4 PWDs and other disadvantaged groups" }
     ],
     REPORTED_PLACED: [
-      { value: "LOCAL", label: "10.6.1 Local employment" },
-      { value: "OVERSEAS", label: "10.6.2 Overseas employment" },
-      { value: "BOTH", label: "10.6.3 Local and Overseas employment" },
-      { value: "PWD", label: "10.6.4 PWDs and other disadvantaged groups" }
+      { value: "LOCAL_PLACED", label: "10.6.1 Local employment" },
+      { value: "OVERSEAS_PLACED", label: "10.6.2 Overseas employment" },
+      { value: "BOTH_PLACED", label: "10.6.3 Local and Overseas employment" },
+      { value: "PWD_PLACED", label: "10.6.4 PWDs and other disadvantaged groups" }
     ],
     PRAS_ASSISTED: [
-      { value: "REGISTERED", label: "10.7.1 Job applicants registed" },
-      { value: "PLACED", label: "10.7.2 Job applicants placed" }
+      { value: "PRAS_REGISTERED", label: "10.7.1 Job applicants registered" },
+      { value: "PRAS_PLACED", label: "10.7.2 Job applicants placed" }
     ],
     LRA: [
-      { value: "ASSISTED", label: "10.8.1 LRA assisted" },
-      { value: "VACANCIES", label: "10.8.2 Job vacancies solicited" },
-      { value: "APPLICANTS", label: "10.8.3 Job applicants registered" },
-      { value: "HIRED_ON_SPOT", label: "10.8.4 Job applicants hired on the spot" },
-      { value: "REPORTED_PLACED", label: "10.8.5 Job applicants reported placed" }
+      { value: "LRA_ASSISTED", label: "10.8.1 LRA assisted" },
+      { value: "LRA_VACANCIES", label: "10.8.2 Job vacancies solicited" },
+      { value: "LRA_APPLICANTS", label: "10.8.3 Job applicants registered" },
+      { value: "LRA_HIRED", label: "10.8.4 Job applicants hired on the spot" },
+      { value: "LRA_PLACED", label: "10.8.5 Job applicants reported placed" }
     ],
     LRA_ASSISTED: [
-      { value: "LGU", label: "10.8.1.1 Local Government Units" },
-      { value: "PRIVATE", label: "10.8.2.1 Private Institutions" },
-      { value: "SCHOOLS", label: "10.8.3.1 Schools" }
+      { value: "LRA_LGU", label: "10.8.1.1 Local Government Units" },
+      { value: "LRA_PRIVATE", label: "10.8.2.1 Private Institutions" },
+      { value: "LRA_SCHOOLS", label: "10.8.3.1 Schools" }
     ],
     LRA_APPLICANTS: [
       { value: "FEMALE", label: "10.8.3.1 Female" }
@@ -403,21 +431,21 @@ export default function ReportPage() {
       { value: "FEMALE", label: "3.4.2.1 Female" }
     ],
     REGULAR_PROGRAM_PLACED: [
-      { value: "LOCAL_EMPLOYMENT", label: "4.1.1 Local Employment" },
-      { value: "OVERSEAS_EMPLOYMENT", label: "4.1.2 Overseas employment" },
-      { value: "SELF_EMPLOYMENT", label: "4.1.3 Self-employment" },
-      { value: "TRAINING", label: "4.1.4 Training" }
+      { value: "LOCAL_EMPLOYMENT_PLACED", label: "4.1.1 Local Employment" },
+      { value: "OVERSEAS_EMPLOYMENT_PLACED", label: "4.1.2 Overseas employment" },
+      { value: "SELF_EMPLOYMENT_PLACED", label: "4.1.3 Self-employment" },
+      { value: "TRAINING_PLACED", label: "4.1.4 Training" }
     ],
     SPES_PLACED: [
-      { value: "PUBLIC_SECTOR", label: "4.2.1 Public Sector" },
-      { value: "PRIVATE_SECTOR", label: "4.2.2 Private Sector" }
+      { value: "PUBLIC_SECTOR_PLACED", label: "4.2.1 Public Sector" },
+      { value: "PRIVATE_SECTOR_PLACED", label: "4.2.2 Private Sector" }
     ],
     WAP_PLACED: [
       { value: "FEMALE", label: "4.3.1 Female" }
     ],
     TULAY_PLACED: [
-      { value: "WAGE_EMPLOYMENT", label: "4.4.1 Wage employment" },
-      { value: "SELF_EMPLOYMENT", label: "4.4.2 Self-employment" }
+      { value: "WAGE_EMPLOYMENT_PLACED", label: "4.4.1 Wage employment" },
+      { value: "SELF_EMPLOYMENT_TULAY_PLACED", label: "4.4.2 Self-employment" }
     ],
     RETRENCHED_PLACED: [
       { value: "FEMALE", label: "4.5.1 Female" }
@@ -454,6 +482,114 @@ export default function ReportPage() {
     ],
     SELF_EMPLOYMENT_TULAY_PLACED: [
       { value: "FEMALE", label: "4.4.2.1 Female" }
+    ],
+    // Sub-sub indicators for Local Employment under Regular Program
+    LOCAL_EMPLOYMENT: [
+      { value: "FEMALE", label: "1.1.1.1 Female" }
+    ],
+    // Sub-sub indicators for Overseas Employment under Regular Program
+    OVERSEAS_EMPLOYMENT: [
+      { value: "FEMALE", label: "1.1.2.1 Female" }
+    ],
+    // Sub-sub indicators for Public Sector under SPES
+    PUBLIC_SECTOR: [
+      { value: "FEMALE", label: "1.2.1.1 Female" }
+    ],
+    // Sub-sub indicators for Private Sector under SPES
+    PRIVATE_SECTOR: [
+      { value: "FEMALE", label: "1.2.2.1 Female" }
+    ],
+    // Sub-sub indicators for Wage Employment under TULAY
+    WAGE_EMPLOYMENT: [
+      { value: "FEMALE", label: "1.4.1.1 Female" }
+    ],
+    // Sub-sub indicators for Self Employment under TULAY
+    SELF_EMPLOYMENT: [
+      { value: "FEMALE", label: "1.4.2.1 Female" }
+    ],
+    // Applicants Registered (2) - Other Categories
+    RETRENCHED_APPLICANTS: [
+      { value: "FEMALE", label: "2.5.1 Female" }
+    ],
+    OFWS_APPLICANTS: [
+      { value: "FEMALE", label: "2.6.1 Female" }
+    ],
+    MIGRATORY_APPLICANTS: [
+      { value: "FEMALE", label: "2.7.1 Female" }
+    ],
+    RURAL_APPLICANTS: [
+      { value: "FEMALE", label: "2.8.1 Female" }
+    ],
+    // Sub-sub indicators for TULAY 2000 Wage Employment
+    WAGE_EMPLOYMENT_APPLICANTS: [
+      { value: "FEMALE", label: "2.4.1.1 Female" }
+    ],
+    // Sub-sub indicators for TULAY 2000 Self Employment
+    SELF_EMPLOYMENT_APPLICANTS: [
+      { value: "FEMALE", label: "2.4.2.1 Female" }
+    ],
+    // PWD Training (6)
+    BENEFICIARIES_TRAINING: [
+      { value: "FEMALE", label: "6.1.1 Female" }
+    ],
+    // Sub-sub indicators for Job Fair Applicants
+    LOCAL_APPLICANTS: [
+      { value: "FEMALE", label: "10.4.1.1 Female" }
+    ],
+    OVERSEAS_APPLICANTS: [
+      { value: "FEMALE", label: "10.4.2.1 Female" }
+    ],
+    BOTH_APPLICANTS: [
+      { value: "FEMALE", label: "10.4.3.1 Female" }
+    ],
+    PWD_APPLICANTS: [
+      { value: "FEMALE", label: "10.4.4.1 Female" }
+    ],
+    // Sub-sub indicators for Hired on Spot
+    LOCAL_HIRED: [
+      { value: "FEMALE", label: "10.5.1.1 Female" }
+    ],
+    OVERSEAS_HIRED: [
+      { value: "FEMALE", label: "10.5.2.1 Female" }
+    ],
+    BOTH_HIRED: [
+      { value: "FEMALE", label: "10.5.3.1 Female" }
+    ],
+    PWD_HIRED: [
+      { value: "FEMALE", label: "10.5.4.1 Female" }
+    ],
+    // Sub-sub indicators for Reported Placed
+    LOCAL_PLACED: [
+      { value: "FEMALE", label: "10.6.1.1 Female" }
+    ],
+    OVERSEAS_PLACED: [
+      { value: "FEMALE", label: "10.6.2.1 Female" }
+    ],
+    BOTH_PLACED: [
+      { value: "FEMALE", label: "10.6.3.1 Female" }
+    ],
+    PWD_PLACED: [
+      { value: "FEMALE", label: "10.6.4.1 Female" }
+    ],
+    // Sub-sub indicators for PRAS
+    PRAS_REGISTERED: [
+      { value: "FEMALE", label: "10.7.1.1 Female" }
+    ],
+    PRAS_PLACED: [
+      { value: "FEMALE", label: "10.7.2.1 Female" }
+    ],
+    // Sub-indicators for LRA Assisted
+    LRA_LGU: [
+      { value: "FEMALE", label: "10.8.1.1 Female" }
+    ],
+    LRA_PRIVATE: [
+      { value: "FEMALE", label: "10.8.2.1 Female" }
+    ],
+    LRA_SCHOOLS: [
+      { value: "FEMALE", label: "10.8.3.1 Female" }
+    ],
+    LRA_VACANCIES: [
+      { value: "FEMALE", label: "10.8.2.1 Female" }
     ]
   };
 
@@ -463,12 +599,12 @@ export default function ReportPage() {
       employmentFacilitation: [
         ...prev.employmentFacilitation,
         {
-          program: "",
+          program: "" as ProgramType,
           indicator: "",
-          subIndicator: "",
-          subSubIndicator: "",
-          previousReportPeriod: 0,
-          currentPeriod: 0,
+          sub_indicator: "",
+          sub_sub_indicator: "",
+          previous_report_period: 0,
+          current_period: 0,
           remarks: ""
         }
       ]
@@ -483,244 +619,264 @@ export default function ReportPage() {
   };
 
   return (
-    <div className="p-6 max-w-[95%] mx-auto">
-      {/* Form Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold">Department of Labor and Employment</h1>
-          <p className="text-lg mt-2">Monthly Report on Implementation of Employment Programs</p>
-          <p className="text-sm text-gray-600 mt-1">Revised SPRPS Form 2003-1</p>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-[1400px] mx-auto px-4">
+        {/* Form Header with Card Style */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
+          <div className="text-center max-w-3xl mx-auto">
+            <h1 className="text-3xl font-bold text-gray-900">Department of Labor and Employment</h1>
+            <p className="text-lg mt-3 text-gray-600">Monthly Report on Implementation of Employment Programs</p>
+            <p className="text-sm text-gray-500 mt-2">Revised SPRPS Form 2003-1</p>
+          </div>
+
+          {/* Report Period and Office Section */}
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Reporting Period</label>
+              <input
+                type="month"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                value={formData.reportingPeriod}
+                onChange={(e) => setFormData({ ...formData, reportingPeriod: e.target.value })}
+              />
+              {errors.reportingPeriod && (
+                <p className="text-red-500 text-sm mt-1">{errors.reportingPeriod}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Reporting Office</label>
+              <input
+                type="text"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                value={formData.reportingOffice}
+                onChange={(e) => setFormData({ ...formData, reportingOffice: e.target.value })}
+                placeholder="Enter reporting office"
+              />
+              {errors.reportingOffice && (
+                <p className="text-red-500 text-sm mt-1">{errors.reportingOffice}</p>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Reporting Period</label>
-            <input
-              type="month"
-              className="w-full p-2 border rounded dark:bg-gray-700"
-              value={formData.reportingPeriod}
-              onChange={(e) => setFormData({ ...formData, reportingPeriod: e.target.value })}
-            />
-            {errors.reportingPeriod && (
-              <p className="text-red-500 text-sm mt-1">{errors.reportingPeriod}</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Reporting Office</label>
-            <input
-              type="text"
-              className="w-full p-2 border rounded dark:bg-gray-700"
-              value={formData.reportingOffice}
-              onChange={(e) => setFormData({ ...formData, reportingOffice: e.target.value })}
-            />
-            {errors.reportingOffice && (
-              <p className="text-red-500 text-sm mt-1">{errors.reportingOffice}</p>
-            )}
-          </div>
-        </div>
-      </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            {/* Section Header */}
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">I. EMPLOYMENT FACILITATION</h2>
+              <p className="text-sm text-gray-600 mt-1">A. PUBLIC EMPLOYMENT SERVICE OFFICE</p>
+            </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-          {/* Section Header */}
-          <div className="border-b p-4">
-            <h2 className="text-xl font-semibold">I. EMPLOYMENT FACILITATION</h2>
-            <p className="text-sm text-gray-600 mt-1">A. PUBLIC EMPLOYMENT SERVICE OFFICE</p>
-          </div>
+            {/* Quick Add Section */}
+            <div className="p-6 border-b border-gray-200 bg-gray-50">
+              <div className="flex flex-col space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-gray-900">Quick Add Programs</h3>
+                  <button
+                    type="button"
+                    onClick={() => addNewRow()}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Add Custom Entry
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {programOptions.map((program) => (
+                    <button
+                      key={program.value}
+                      type="button"
+                      onClick={() => {
+                        const newRow = {
+                          program: program.value as ProgramType,
+                          indicator: "",
+                          sub_indicator: "",
+                          sub_sub_indicator: "",
+                          previous_report_period: 0,
+                          current_period: 0,
+                          remarks: ""
+                        };
+                        setFormData(prev => ({
+                          ...prev,
+                          employmentFacilitation: [...prev.employmentFacilitation, newRow]
+                        }));
+                      }}
+                      className="flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                    >
+                      <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 mr-2">
+                        {program.label.split('.')[0]}
+                      </span>
+                      <span className="truncate">{program.label.split('.')[1]}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-          {/* Table Section */}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] table-fixed border-collapse">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-700 text-sm">
-                  <th className="px-4 py-3 text-left border w-[8%] align-top">KRA</th>
-                  <th className="px-4 py-3 text-left border w-[20%] align-top">PROGRAM</th>
-                  <th className="px-4 py-3 text-left border w-[35%] align-top">
-                    <div>INDICATOR</div>
-                    <div className="text-xs text-gray-500">(OUTPUT SPECIFICATION)</div>
-                  </th>
-                  <th className="px-4 py-3 text-center border w-[12%] align-top">
-                    <div>PREVIOUS</div>
-                    <div>REPORTING</div>
-                    <div>PERIOD</div>
-                  </th>
-                  <th className="px-4 py-3 text-center border w-[12%] align-top">
-                    <div>CURRENT</div>
-                    <div>REPORTING</div>
-                    <div>PERIOD</div>
-                  </th>
-                  <th className="px-4 py-3 text-center border w-[10%] align-top">REMARKS</th>
-                  <th className="px-4 py-3 w-[3%] align-top"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {formData.employmentFacilitation.map((row, index) => (
-                  <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-4 py-2 border align-top">I</td>
-                    <td className="px-4 py-2 border">
-                      <div className="relative">
-                        <select
-                          className={`w-full p-2 border rounded dark:bg-gray-700 text-sm appearance-none ${errors[`row${index}_program`] ? 'border-red-500' : ''
-                            }`}
-                          value={row.program}
-                          onChange={(e) => {
-                            updateRow(index, "program", e.target.value);
-                            updateRow(index, "indicator", "");
-                            updateRow(index, "subIndicator", "");
-                          }}
-                        >
-                          <option value="">Select Program</option>
-                          {programOptions.map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                          <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                            <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                          </svg>
-                        </div>
-                      </div>
-                      {errors[`row${index}_program`] && (
-                        <p className="text-red-500 text-xs mt-1">{errors[`row${index}_program`]}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 border">
-                      <div className="space-y-2">
-                        <div className="relative">
-                          <select
-                            className={`w-full p-2 border rounded dark:bg-gray-700 text-sm appearance-none ${errors[`row${index}_indicator`] ? 'border-red-500' : ''
-                              }`}
-                            value={row.indicator}
-                            onChange={(e) => {
-                              updateRow(index, "indicator", e.target.value);
-                              updateRow(index, "subIndicator", "");
-                            }}
-                          >
-                            <option value="">Select Indicator</option>
-                            {indicatorOptions[row.program as keyof typeof indicatorOptions]?.map(option => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                              <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                            </svg>
-                          </div>
-                        </div>
-                        {row.indicator && (
+            {/* Table Section */}
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-6 py-4 text-left border-b border-gray-200 font-semibold text-gray-900 w-[8%]">KRA</th>
+                    <th className="px-6 py-4 text-left border-b border-gray-200 font-semibold text-gray-900 w-[20%]">INDICATOR</th>
+                    <th className="px-6 py-4 text-left border-b border-gray-200 font-semibold text-gray-900 w-[35%]">
+                      <div>OTHER SPECIFICATION</div>
+                    </th>
+                    <th className="px-6 py-4 text-center border-b border-gray-200 font-semibold text-gray-900 w-[12%]">
+                      <div>PREVIOUS</div>
+                      <div className="text-xs font-normal text-gray-500">REPORTING PERIOD</div>
+                    </th>
+                    <th className="px-6 py-4 text-center border-b border-gray-200 font-semibold text-gray-900 w-[12%]">
+                      <div>CURRENT</div>
+                      <div className="text-xs font-normal text-gray-500">REPORTING PERIOD</div>
+                    </th>
+                    <th className="px-6 py-4 w-[3%] border-b border-gray-200"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {formData.employmentFacilitation.map((row, index) => (
+                    <tr key={index} className="group hover:bg-blue-50 transition-colors">
+                      <td className="px-6 py-4">I</td>
+                      <td className="px-6 py-4">
+                        <div className="space-y-3">
                           <div className="relative">
                             <select
-                              className="w-full p-2 border rounded dark:bg-gray-700 text-sm appearance-none"
-                              value={row.subIndicator}
-                              onChange={(e) => updateRow(index, "subIndicator", e.target.value)}
+                              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors appearance-none"
+                              value={row.program}
+                              onChange={(e) => updateRow(index, "program", e.target.value as ProgramType)}
                             >
-                              <option value="">Select Sub-Indicator</option>
-                              {subIndicatorOptions[row.indicator as keyof typeof subIndicatorOptions]?.map(option => (
+                              <option value="">Select Program</option>
+                              {programOptions.map(option => (
                                 <option key={option.value} value={option.value}>
                                   {option.label}
                                 </option>
                               ))}
                             </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                              <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                              </svg>
-                            </div>
                           </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 border">
-                      <input
-                        type="number"
-                        min="0"
-                        className={`w-full p-2 border rounded text-center dark:bg-gray-700 ${errors[`row${index}_previous`] ? 'border-red-500' : ''
-                          }`}
-                        value={row.previousReportPeriod}
-                        onChange={(e) => updateRow(index, "previousReportPeriod", parseInt(e.target.value) || 0)}
-                      />
-                    </td>
-                    <td className="px-4 py-2 border">
-                      <input
-                        type="number"
-                        min="0"
-                        className={`w-full p-2 border rounded text-center dark:bg-gray-700 ${errors[`row${index}_current`] ? 'border-red-500' : ''
-                          }`}
-                        value={row.currentPeriod}
-                        onChange={(e) => updateRow(index, "currentPeriod", parseInt(e.target.value) || 0)}
-                      />
-                    </td>
-                    <td className="px-4 py-2 border">
-                      <input
-                        type="text"
-                        className="w-full p-2 border rounded dark:bg-gray-700"
-                        value={row.remarks || ''}
-                        onChange={(e) => updateRow(index, "remarks", e.target.value)}
-                        placeholder="Optional"
-                      />
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => removeRow(index)}
-                        className="text-red-500 hover:text-red-700"
-                        title="Remove row"
-                      >
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                          {row.program && (
+                            <div className="relative">
+                              <select
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors appearance-none"
+                                value={row.indicator}
+                                onChange={(e) => updateRow(index, "indicator", e.target.value)}
+                              >
+                                <option value="">Select Indicator</option>
+                                {indicatorOptions[row.program]?.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="space-y-3">
+                          {row.indicator && (
+                            <div className="relative">
+                              <select
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors appearance-none"
+                                value={row.sub_indicator}
+                                onChange={(e) => updateRow(index, "sub_indicator", e.target.value)}
+                              >
+                                <option value="">Select Sub-Indicator</option>
+                                {subIndicatorOptions[row.indicator]?.map((option: IndicatorOption) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          {row.sub_indicator && subIndicatorOptions[row.sub_indicator] && (
+                            <div className="relative">
+                              <select
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors appearance-none"
+                                value={row.sub_sub_indicator}
+                                onChange={(e) => updateRow(index, "sub_sub_indicator", e.target.value)}
+                              >
+                                <option value="">Select Sub-Sub-Indicator</option>
+                                {subIndicatorOptions[row.sub_indicator]?.map((option: IndicatorOption) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          value={row.previous_report_period}
+                          onChange={(e) => updateRow(index, "previous_report_period", parseInt(e.target.value) || 0)}
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          value={row.current_period}
+                          onChange={(e) => updateRow(index, "current_period", parseInt(e.target.value) || 0)}
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          type="button"
+                          onClick={() => removeRow(index)}
+                          className="invisible group-hover:visible p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-50 transition-colors"
+                          title="Remove row"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {/* Add Row Button */}
-          <div className="p-4 border-t">
+          {/* Form Actions */}
+          <div className="flex justify-end gap-4">
             <button
               type="button"
-              onClick={addNewRow}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
+              onClick={() => router.back()}
+              className="px-6 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+              disabled={loading}
             >
-              <span className="mr-2">+</span> Add Row
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading}
+            >
+              {loading ? (
+                <div className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Saving Report...
+                </div>
+              ) : (
+                'Submit Report'
+              )}
             </button>
           </div>
-        </div>
-
-        {/* Form Actions */}
-        <div className="flex justify-end space-x-4">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="px-6 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200"
-            disabled={loading}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className={`px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center ${loading ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Saving...
-              </>
-            ) : (
-              'Submit Report'
-            )}
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

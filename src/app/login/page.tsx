@@ -33,11 +33,14 @@ export default function LoginPage() {
         return;
       }
 
-      // Update both localStorage and AuthContext
+      // Store complete user profile data
       const userData = {
         id: data.id,
         email: data.email,
         role: data.role,
+        name: data.name,
+        municipal_mayor: data.municipal_mayor,
+        address: data.address
       };
 
       login(userData);
