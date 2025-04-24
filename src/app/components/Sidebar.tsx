@@ -96,7 +96,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               </div>
               {isOpen && (
                 <div className="flex flex-col">
-                  <span className="text-xl font-semibold text-white">DOLE X</span>
+                  <span className="text-xl font-semibold text-white">PESO</span>
                   <span className="text-xs text-gray-400">Region X</span>
                 </div>
               )}

@@ -1,4 +1,4 @@
-import html2canvas from 'html2canvas'
+import html2canvas from 'html2canvas-pro'
 import jsPDF from 'jspdf'
 
 interface StyleOptions {
@@ -249,13 +249,17 @@ export const exportToPDF = async (
     isSummary: boolean = false
 ) => {
     try {
-        onExportStart?.()
+        if (onExportStart) onExportStart()
 
-        // Create a clone of the report element
+        // Create a clone of the element to avoid modifying the original
         const clone = reportElement.cloneNode(true) as HTMLElement
         document.body.appendChild(clone)
+        clone.style.display = 'block'
+        clone.style.position = 'absolute'
+        clone.style.left = '-9999px'
+        clone.style.top = '-9999px'
 
-        // Apply appropriate styles based on the type of report
+        // Apply appropriate styles based on the type of document
         if (isSummary) {
             setupSummaryStyles(clone)
         } else {
@@ -264,38 +268,41 @@ export const exportToPDF = async (
             setupContentStyles(clone)
         }
 
-        // Capture the clone with html2canvas
+        // Enhanced html2canvas configuration
         const canvas = await html2canvas(clone, {
-            scale: 2,
+            scale: 2, // Higher scale for better quality
             useCORS: true,
-            logging: false,
+            allowTaint: true,
             backgroundColor: '#ffffff',
-            windowWidth: 2480, // A4 width at 300 DPI
-            windowHeight: 3508, // A4 height at 300 DPI
+            logging: false,
+            windowWidth: clone.scrollWidth,
+            windowHeight: clone.scrollHeight,
+            onclone: (clonedDoc) => {
+                const clonedElement = clonedDoc.body.firstChild as HTMLElement;
+                if (clonedElement) {
+                    clonedElement.style.transform = 'none';
+                }
+            }
         })
 
         // Remove the clone after capturing
         document.body.removeChild(clone)
 
-        // Create PDF with appropriate orientation
+        const imgData = canvas.toDataURL('image/jpeg', 1.0)
         const pdf = new jsPDF({
-            orientation: isSummary ? 'portrait' : 'landscape',
+            orientation: 'landscape',
             unit: 'mm',
-            format: 'a4',
+            format: 'a4'
         })
 
-        // Add the canvas to the PDF
-        const imgData = canvas.toDataURL('image/png')
         const pdfWidth = pdf.internal.pageSize.getWidth()
         const pdfHeight = pdf.internal.pageSize.getHeight()
-
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
-
-        // Save the PDF
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight)
         pdf.save(filename)
+
+        if (onExportEnd) onExportEnd()
     } catch (error) {
-        console.error('Error exporting to PDF:', error)
-    } finally {
-        onExportEnd?.()
+        console.error('Error exporting PDF:', error)
+        if (onExportEnd) onExportEnd()
     }
 } 
