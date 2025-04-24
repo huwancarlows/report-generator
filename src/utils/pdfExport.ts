@@ -196,6 +196,29 @@ export const exportToPDF = async (
             return false;
         };
 
+        // Get report data and profile information
+        const reportDataAttr = reportElement.getAttribute('data-report');
+        let profile = null;
+
+        if (reportDataAttr) {
+            try {
+                const reportData = JSON.parse(reportDataAttr);
+                profile = reportData.profile;
+            } catch (error) {
+                console.error('Error parsing report data:', error);
+            }
+        }
+
+        // If profile is not found in data-report, try getting from the footer section
+        if (!profile) {
+            const preparerName = reportElement.querySelector('.prepared-by .text-gray-900.font-medium')?.textContent || '';
+            const mayorName = reportElement.querySelector('.approved-by .text-gray-900.font-medium')?.textContent?.replace('HON. ', '') || '';
+            profile = {
+                name: preparerName,
+                municipal_mayor: mayorName
+            };
+        }
+
         // Add header to first page
         addHeaderToNewPage(pdf, 1, 1);
         currentY = 25;
@@ -261,41 +284,41 @@ export const exportToPDF = async (
         await autoTable(pdf, tableConfig);
         currentY = (pdf as any).lastAutoTable.finalY + 20;
 
-        // Get user information
-        const reportData = reportElement.getAttribute('data-report');
-        const report = reportData ? JSON.parse(reportData) : null;
-
         // Check if we need a new page for footer
         checkForNewPage(80); // Reserve space for footer section
 
-        // Footer section
+        // Footer section with profile data
         const leftColumn = 15;
         const rightColumn = pageWidth / 2;
 
         pdf.setFontSize(pdfStyles.fonts.normal);
         pdf.text('PREPARED BY:', leftColumn, currentY);
         pdf.text('APPROVED:', rightColumn, currentY);
-        currentY += 10;
+        currentY += 15;
 
-        // Add preparer details
+        // Add preparer details using profile data
         pdf.setFontSize(pdfStyles.fonts.subHeader);
-        pdf.text(report?.preparer_name || '', leftColumn, currentY);
+        pdf.text(profile?.name || '', leftColumn, currentY);
+        currentY += 5;
         pdf.setFontSize(pdfStyles.fonts.normal);
-        pdf.text('PESO MANAGER - Designate', leftColumn, currentY + 5);
+        pdf.text('PESO MANAGER - Designate', leftColumn, currentY);
 
-        // Add approver details
+        // Add approver details using profile data
         pdf.setFontSize(pdfStyles.fonts.subHeader);
-        pdf.text(`HON. ${report?.mayor_name || ''}`, rightColumn, currentY);
+        pdf.text(`HON. ${profile?.municipal_mayor || ''}`, rightColumn, currentY - 5);
         pdf.setFontSize(pdfStyles.fonts.normal);
-        pdf.text('MUNICIPAL MAYOR', rightColumn, currentY + 5);
-        currentY += 20;
+        pdf.text('MUNICIPAL MAYOR', rightColumn, currentY);
 
-        // Add dates
+        currentY += 15;
+
+        // Add dates with proper spacing
         const currentDate = format(new Date(), 'dd-MMM-yy');
         pdf.text(currentDate, leftColumn, currentY);
         pdf.text('_______________________________________', rightColumn, currentY);
-        pdf.text('Date', leftColumn, currentY + 5);
-        pdf.text('Date', rightColumn, currentY + 5);
+        currentY += 5;
+        pdf.text('Date', leftColumn, currentY);
+        pdf.text('Date', rightColumn, currentY);
+
         currentY += 15;
 
         // Check if we need a new page for the note

@@ -312,7 +312,14 @@ export default function ReportEntryPage() {
       </div>
 
       {/* Main Report Content */}
-      <div id={`report-${selectedReportIndex}`} className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 mb-12">
+      <div
+        id={`report-${selectedReportIndex}`}
+        className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 mb-12"
+        data-report={JSON.stringify({
+          ...reportData[selectedReportIndex],
+          profile: userProfile
+        })}
+      >
         <div className="bg-white p-8 border-b border-gray-200">
           <div className="text-center max-w-3xl mx-auto">
             <h1 className="text-3xl font-bold text-gray-900">Department of Labor and Employment</h1>
@@ -417,17 +424,15 @@ export default function ReportEntryPage() {
 
           {/* Footer Section */}
           <div className="mt-8 grid grid-cols-2 gap-8">
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 prepared-by">
               <div className="font-semibold text-gray-900 mb-2">PREPARED BY:</div>
               <div className="text-gray-900 font-medium">{userProfile?.name || 'N/A'}</div>
-              <div className="text-sm text-gray-600 mt-1">PESO Staff</div>
-              <div className="text-sm text-gray-500 mt-1">{userProfile?.address || 'N/A'}</div>
+              <div className="text-sm text-gray-600 mt-1">PESO MANAGER - Designate</div>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 approved-by">
               <div className="font-semibold text-gray-900 mb-2">APPROVED BY:</div>
               <div className="text-gray-900 font-medium">HON. {userProfile?.municipal_mayor || 'N/A'}</div>
               <div className="text-sm text-gray-600 mt-1">MUNICIPAL MAYOR</div>
-              <div className="text-sm text-gray-500 mt-1">{userProfile?.address || 'N/A'}</div>
             </div>
           </div>
 
@@ -639,7 +644,14 @@ export default function ReportEntryPage() {
       </div>
 
       {/* Hidden Summary for PDF Export */}
-      <div id={`summary-${selectedReportIndex}`} className="hidden">
+      <div
+        id={`summary-${selectedReportIndex}`}
+        className="hidden"
+        data-report={JSON.stringify({
+          ...reportData[selectedReportIndex],
+          profile: userProfile
+        })}
+      >
         <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
           <div className="bg-blue-600 text-white p-6">
             <div className="text-center max-w-3xl mx-auto">

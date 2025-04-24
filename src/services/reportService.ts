@@ -1,5 +1,5 @@
 import { supabase, handleSupabaseError } from '../lib/supabase';
-import { CompleteReport, EmploymentFacilitation, Report, ProgramType } from '../types/database.types';
+import { CompleteReport, EmploymentFacilitation, Report, ProgramType, Profile } from '../types/database.types';
 
 export const reportService = {
   async createReport(
@@ -43,7 +43,7 @@ export const reportService = {
           current_period: entry.current_period,
           remarks: entry.remarks,
         })),
-        profile_id: user.id // Use the user's ID directly
+        profile_id: user.id
       });
 
       if (rpcError) {
@@ -51,10 +51,21 @@ export const reportService = {
         return handleSupabaseError<null>(rpcError, null);
       }
 
-      // Fetch the latest report
-      const { data: recentReports, error: fetchError } = await supabase
+      // Fetch the latest report with profile information
+      const { data: recentReport, error: fetchError } = await supabase
         .from("employment_reports")
-        .select("*, employment_facilitation_entries(*)")
+        .select(`
+          *,
+          employment_facilitation_entries (*),
+          profile:profiles (
+            id,
+            email,
+            role,
+            name,
+            municipal_mayor,
+            address
+          )
+        `)
         .eq("reporting_period", reportingPeriod)
         .eq("reporting_office", reportingOffice)
         .eq("profile_id", user.id)
@@ -62,14 +73,15 @@ export const reportService = {
         .limit(1)
         .maybeSingle();
 
-      if (fetchError || !recentReports) {
+      if (fetchError || !recentReport) {
         console.error("Failed to fetch newly inserted report");
         return handleSupabaseError<null>(fetchError, null);
       }
 
       return {
-        ...recentReports,
-        entries: recentReports.employment_facilitation_entries || [],
+        ...recentReport,
+        entries: recentReport.employment_facilitation_entries || [],
+        profile: recentReport.profile
       };
     } catch (error) {
       console.error('Unexpected error in createReport:', error);
@@ -95,26 +107,30 @@ export const reportService = {
 
   async getReport(id: string): Promise<CompleteReport | null> {
     try {
-      // Fetch the report from the correct table
       const { data: report, error: reportError } = await supabase
-        .from('employment_reports')  // Change from 'reports' to 'employment_reports'
-        .select('*')
+        .from('employment_reports')
+        .select(`
+          *,
+          employment_facilitation_entries (*),
+          profile:profiles (
+            id,
+            email,
+            role,
+            name,
+            municipal_mayor,
+            address
+          )
+        `)
         .eq('id', id)
         .single();
 
       if (reportError) return handleSupabaseError<null>(reportError, null);
-
-      // Fetch related entries from employment_facilitation_entries
-      const { data: entries, error: entriesError } = await supabase
-        .from('employment_facilitation_entries')  // Corrected table name
-        .select('*')
-        .eq('report_id', id);
-
-      if (entriesError) return handleSupabaseError<null>(entriesError, null);
+      if (!report) return null;
 
       return {
         ...report,
-        entries: entries || [],
+        entries: report.employment_facilitation_entries || [],
+        profile: report.profile
       };
     } catch (error) {
       return handleSupabaseError<null>(error, null);
@@ -123,7 +139,6 @@ export const reportService = {
 
   async getUserReports(): Promise<CompleteReport[]> {
     try {
-      // Get user from localStorage
       const storedUser = localStorage.getItem("user");
       if (!storedUser) {
         console.error('No authenticated user found');
@@ -136,10 +151,20 @@ export const reportService = {
         return [];
       }
 
-      // Get reports for the current user
       const { data: reports, error: reportsError } = await supabase
         .from('employment_reports')
-        .select('*')
+        .select(`
+          *,
+          employment_facilitation_entries (*),
+          profile:profiles (
+            id,
+            email,
+            role,
+            name,
+            municipal_mayor,
+            address
+          )
+        `)
         .eq('profile_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -152,21 +177,10 @@ export const reportService = {
         return [];
       }
 
-      // Get entries for these reports
-      const reportIds = reports.map(report => report.id);
-      const { data: entries, error: entriesError } = await supabase
-        .from('employment_facilitation_entries')
-        .select('*')
-        .in('report_id', reportIds);
-
-      if (entriesError) {
-        console.error('Error fetching entries:', entriesError);
-        return [];
-      }
-
       return reports.map(report => ({
         ...report,
-        entries: entries?.filter(entry => entry.report_id === report.id) || []
+        entries: report.employment_facilitation_entries || [],
+        profile: report.profile
       }));
     } catch (error) {
       console.error('Unexpected error in getUserReports:', error);

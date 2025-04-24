@@ -632,7 +632,7 @@ export default function DashboardPage() {
                   className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
                 >
                   {isExporting ? 'Exporting...' : 'Export'}
-                </button>
+                </button>x``
               </div>
               <div className="h-[300px]">
                 <Pie data={sectorData} options={pieChartOptions} />
