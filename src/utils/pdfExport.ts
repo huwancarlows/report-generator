@@ -1,245 +1,169 @@
-import html2canvas from 'html2canvas-pro'
 import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import { pdfStyles, tableHeaders, instructions, note } from './pdfStyles'
+import { format } from 'date-fns'
 
 interface StyleOptions {
     element: HTMLElement;
     styles: Partial<CSSStyleDeclaration>;
 }
 
-const applyStyles = ({ element, styles }: StyleOptions) => {
-    Object.assign(element.style, styles)
+const addHeaderLogo = (pdf: jsPDF) => {
+    // Add DOLE logo placeholder
+    pdf.setDrawColor(0);
+    pdf.setFillColor(245, 245, 245);
+    pdf.roundedRect(15, 15, 25, 25, 3, 3, 'F');
+
+    // Add header text in official format
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(11);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text('Republic of the Philippines', pdf.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(12);
+    pdf.text('DEPARTMENT OF LABOR AND EMPLOYMENT', pdf.internal.pageSize.getWidth() / 2, 25, { align: 'center' });
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(11);
+    pdf.text('Regional Office No. X', pdf.internal.pageSize.getWidth() / 2, 30, { align: 'center' });
+
+    // Add thick line below header
+    pdf.setLineWidth(0.5);
+    pdf.line(15, 35, pdf.internal.pageSize.getWidth() - 15, 35);
 }
 
-const setupBasicStyles = (clone: HTMLElement) => {
-    clone.style.width = '297mm' // A4 width
-    clone.style.height = '210mm' // A4 height
-    clone.style.padding = '10mm'
-    clone.style.margin = '0'
-    clone.style.backgroundColor = '#ffffff'
-
-    // Remove all Tailwind classes and set basic styles
-    const elements = clone.querySelectorAll('*')
-    elements.forEach(element => {
-        const el = element as HTMLElement
-        el.className = ''
-        applyStyles({
-            element: el,
-            styles: {
-                backgroundColor: '#ffffff',
-                color: '#000000',
-                borderColor: '#000000',
-                fontFamily: 'Arial, sans-serif'
-            }
-        })
-    })
+const addWatermark = (pdf: jsPDF) => {
+    const pages = pdf.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+        pdf.setPage(i);
+        pdf.setTextColor(230, 230, 230);
+        pdf.setFontSize(60);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('DOLE', pdf.internal.pageSize.getWidth() / 2, pdf.internal.pageSize.getHeight() / 2, {
+            align: 'center',
+            angle: 45
+        });
+    }
 }
 
-const setupTableStyles = (clone: HTMLElement) => {
-    // Style table
-    const table = clone.querySelector('table')
-    if (table) {
-        applyStyles({
-            element: table,
-            styles: {
-                width: '100%',
-                borderCollapse: 'collapse',
-                pageBreakInside: 'auto',
-                fontSize: '10px'
-            }
+const extractTableData = (table: HTMLTableElement) => {
+    const headers: string[] = []
+    const data: string[][] = []
+
+    // Extract headers
+    const headerRow = table.querySelector('thead tr')
+    if (headerRow) {
+        headerRow.querySelectorAll('th').forEach(th => {
+            headers.push(th.textContent?.trim() || '')
         })
     }
 
-    // Style table headers
-    const ths = clone.querySelectorAll('th')
-    ths.forEach(th => {
-        applyStyles({
-            element: th,
-            styles: {
-                border: '1px solid #000000',
-                padding: '4px',
-                textAlign: 'center',
-                verticalAlign: 'middle',
-                fontWeight: 'bold',
-                fontSize: '10px',
-                lineHeight: '1.2'
-            }
+    // Extract data rows
+    const rows = table.querySelectorAll('tbody tr')
+    rows.forEach(row => {
+        const rowData: string[] = []
+        row.querySelectorAll('td').forEach(cell => {
+            rowData.push(cell.textContent?.trim() || '')
         })
+        data.push(rowData)
     })
 
-    // Style table cells
-    const tds = clone.querySelectorAll('td')
-    tds.forEach(td => {
-        applyStyles({
-            element: td,
-            styles: {
-                border: '1px solid #000000',
-                padding: '4px',
-                fontSize: '10px',
-                lineHeight: '1.2',
-                verticalAlign: 'top'
-            }
-        })
-    })
+    return { headers, data }
 }
 
-const setupContentStyles = (clone: HTMLElement) => {
-    // Style indicators and sub-indicators
-    const indicators = clone.querySelectorAll('.space-y-1')
-    indicators.forEach(indicator => {
-        applyStyles({
-            element: indicator as HTMLElement,
-            styles: {
-                marginLeft: '0',
-                paddingLeft: '0'
-            }
-        })
-    })
-
-    // Style header text
-    const headerTexts = clone.querySelectorAll('.text-2xl, .text-lg, .text-sm')
-    headerTexts.forEach(text => {
-        applyStyles({
-            element: text as HTMLElement,
-            styles: {
-                marginBottom: '4px',
-                textAlign: 'center'
-            }
-        })
-    })
-
-    // Adjust grid layout for header info
-    const gridContainer = clone.querySelector('.grid')
-    if (gridContainer) {
-        applyStyles({
-            element: gridContainer as HTMLElement,
-            styles: {
-                display: 'flex',
-                justifyContent: 'space-between',
-                marginBottom: '20px'
-            }
-        })
+const extractTextContent = (element: HTMLElement): string => {
+    // Remove any script tags
+    const clone = element.cloneNode(true) as HTMLElement
+    const scripts = clone.getElementsByTagName('script')
+    while (scripts[0]) {
+        scripts[0].parentNode?.removeChild(scripts[0])
     }
 
-    // Style footer section
-    const footerSection = clone.querySelector('.mt-8')
+    // Get text content
+    return clone.textContent?.trim() || ''
+}
+
+const addHeaderInfo = (pdf: jsPDF, element: HTMLElement) => {
+    // Add form title
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('MONTHLY REPORT ON IMPLEMENTATION OF EMPLOYMENT PROGRAMS', pdf.internal.pageSize.getWidth() / 2, 45, { align: 'center' });
+
+    // Add form reference with specific styling
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('(Revised SPRPS Form 2003-1)', pdf.internal.pageSize.getWidth() / 2, 50, { align: 'center' });
+
+    // Add reporting period and office in a box
+    const reportingInfo = element.querySelectorAll('.mb-4 p')
+    pdf.setFillColor(240, 240, 240);
+    pdf.rect(15, 55, pdf.internal.pageSize.getWidth() - 30, 25, 'F');
+    pdf.setDrawColor(0);
+    pdf.rect(15, 55, pdf.internal.pageSize.getWidth() - 30, 25, 'S');
+
+    let yPos = 62
+    pdf.setFontSize(10)
+    pdf.setTextColor(0, 0, 0)
+
+    reportingInfo.forEach((info) => {
+        const text = info.textContent || ''
+        pdf.text(text, 25, yPos)
+        yPos += 7
+    })
+
+    return yPos + 10
+}
+
+const addFooterInfo = (pdf: jsPDF, element: HTMLElement, yPos: number) => {
+    const footerSection = element.querySelector('.mt-8')
     if (footerSection) {
-        applyStyles({
-            element: footerSection as HTMLElement,
-            styles: {
-                marginTop: '20px',
-                display: 'flex',
-                justifyContent: 'space-between'
-            }
+        const signatures = footerSection.querySelectorAll('.grid > div')
+
+        pdf.setDrawColor(0);
+        pdf.setFontSize(10);
+
+        // Add signature boxes with official styling
+        signatures.forEach((sig, index) => {
+            const name = sig.querySelector('p:first-child')?.textContent || ''
+            const title = sig.querySelector('p:last-child')?.textContent || ''
+            const xPos = index === 0 ? 60 : pdf.internal.pageSize.getWidth() - 100
+
+            // Add signature line
+            pdf.setLineWidth(0.2);
+            pdf.line(xPos - 30, yPos, xPos + 30, yPos);
+
+            // Add name and title
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(name, xPos, yPos + 5, { align: 'center' });
+
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(title, xPos, yPos + 10, { align: 'center' });
         })
+
+        // Add date in official format
+        const currentDate = new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`Date: ${currentDate}`, 20, yPos + 25);
     }
 }
 
-const setupSummaryStyles = (clone: HTMLElement) => {
-    // Style the summary container
-    applyStyles({
-        element: clone,
-        styles: {
-            padding: '20mm',
-            backgroundColor: '#ffffff',
-            fontFamily: 'Arial, sans-serif'
-        }
-    })
+const addHeaderToNewPage = (pdf: jsPDF, pageNumber: number, totalPages: number) => {
+    const pageWidth = pdf.internal.pageSize.getWidth();
 
-    // Style the header
-    const header = clone.querySelector('h2')
-    if (header) {
-        applyStyles({
-            element: header,
-            styles: {
-                fontSize: '16px',
-                fontWeight: 'bold',
-                textAlign: 'center',
-                marginBottom: '10mm'
-            }
-        })
-    }
-
-    // Style the reporting info
-    const reportingInfo = clone.querySelectorAll('.mb-4 p')
-    reportingInfo.forEach(info => {
-        applyStyles({
-            element: info as HTMLElement,
-            styles: {
-                fontSize: '12px',
-                textAlign: 'center',
-                marginBottom: '2mm'
-            }
-        })
-    })
-
-    // Style table
-    const table = clone.querySelector('table')
-    if (table) {
-        applyStyles({
-            element: table,
-            styles: {
-                width: '100%',
-                borderCollapse: 'collapse',
-                marginTop: '5mm',
-                marginBottom: '5mm'
-            }
-        })
-    }
-
-    // Style table headers
-    const ths = clone.querySelectorAll('th')
-    ths.forEach(th => {
-        applyStyles({
-            element: th,
-            styles: {
-                backgroundColor: '#f3f4f6',
-                border: '1px solid #000000',
-                padding: '2mm',
-                fontSize: '12px',
-                fontWeight: 'bold'
-            }
-        })
-    })
-
-    // Style table cells
-    const tds = clone.querySelectorAll('td')
-    tds.forEach(td => {
-        applyStyles({
-            element: td,
-            styles: {
-                border: '1px solid #000000',
-                padding: '2mm',
-                fontSize: '11px'
-            }
-        })
-    })
-
-    // Style the footer section
-    const footerSection = clone.querySelector('.mt-8')
-    if (footerSection) {
-        applyStyles({
-            element: footerSection as HTMLElement,
-            styles: {
-                marginTop: '15mm',
-                display: 'flex',
-                justifyContent: 'space-between'
-            }
-        })
-    }
-
-    // Style the signature blocks
-    const signatureBlocks = clone.querySelectorAll('.mt-8 .grid > div')
-    signatureBlocks.forEach(block => {
-        applyStyles({
-            element: block as HTMLElement,
-            styles: {
-                flex: '1',
-                padding: '5mm',
-                maxWidth: '45%'
-            }
-        })
-    })
-}
+    pdf.setFontSize(pdfStyles.fonts.subHeader);
+    pdf.text('Revised SPRPS Form 2003-1', 15, 15);
+    pdf.text('Republic of the Philippines', pageWidth / 2, 15, { align: 'center' });
+    pdf.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - 25, 15);
+};
 
 export const exportToPDF = async (
     reportElement: HTMLElement,
@@ -249,60 +173,146 @@ export const exportToPDF = async (
     isSummary: boolean = false
 ) => {
     try {
-        if (onExportStart) onExportStart()
+        if (onExportStart) onExportStart();
 
-        // Create a clone of the element to avoid modifying the original
-        const clone = reportElement.cloneNode(true) as HTMLElement
-        document.body.appendChild(clone)
-        clone.style.display = 'block'
-        clone.style.position = 'absolute'
-        clone.style.left = '-9999px'
-        clone.style.top = '-9999px'
-
-        // Apply appropriate styles based on the type of document
-        if (isSummary) {
-            setupSummaryStyles(clone)
-        } else {
-            setupBasicStyles(clone)
-            setupTableStyles(clone)
-            setupContentStyles(clone)
+        if (!reportElement) {
+            throw new Error('Report element is required for PDF export');
         }
 
-        // Enhanced html2canvas configuration
-        const canvas = await html2canvas(clone, {
-            scale: 2, // Higher scale for better quality
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#ffffff',
-            logging: false,
-            windowWidth: clone.scrollWidth,
-            windowHeight: clone.scrollHeight,
-            onclone: (clonedDoc) => {
-                const clonedElement = clonedDoc.body.firstChild as HTMLElement;
-                if (clonedElement) {
-                    clonedElement.style.transform = 'none';
+        // Create PDF document
+        const pdf = new jsPDF(pdfStyles.document);
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        let currentY = 0;
+
+        // Function to check if we need a new page
+        const checkForNewPage = (requiredSpace: number) => {
+            if (currentY + requiredSpace > pageHeight - 20) {
+                pdf.addPage();
+                addHeaderToNewPage(pdf, pdf.getNumberOfPages(), pdf.getNumberOfPages());
+                currentY = 30; // Reset Y position after header
+                return true;
+            }
+            return false;
+        };
+
+        // Add header to first page
+        addHeaderToNewPage(pdf, 1, 1);
+        currentY = 25;
+
+        // Add PESO office and DOLE header
+        const pesoOffice = reportElement.querySelector('.reporting-office')?.textContent || 'PESO OFFICE';
+        pdf.setFontSize(pdfStyles.fonts.header);
+        pdf.text(pesoOffice, 15, currentY);
+        pdf.text('DEPARTMENT OF LABOR AND EMPLOYMENT', pageWidth / 2, currentY, { align: 'center' });
+        currentY += 10;
+
+        // Add reporting period and regional office
+        const reportingPeriod = reportElement.querySelector('.reporting-period')?.textContent || '';
+        pdf.text('Monthly Report', 15, currentY);
+        pdf.text('Regional Office No. X', pageWidth / 2, currentY, { align: 'center' });
+        pdf.text(reportingPeriod, pageWidth - 45, currentY);
+        currentY += 10;
+
+        // Add instructions with proper spacing
+        pdf.setFontSize(pdfStyles.fonts.small);
+        const splitInstructions = pdf.splitTextToSize(instructions, pageWidth - 30);
+        checkForNewPage(splitInstructions.length * 5);
+        pdf.text(splitInstructions, 15, currentY);
+        currentY += splitInstructions.length * 5 + 10;
+
+        // Extract and format table data
+        const { data } = extractTableData(reportElement.querySelector('table')!);
+        const formattedData = data.map(row => {
+            while (row.length < 5) row.push('');
+            return row;
+        });
+
+        // Enhanced table configuration for better pagination
+        const tableConfig = {
+            ...pdfStyles.table,
+            head: tableHeaders,
+            body: formattedData,
+            startY: currentY,
+            margin: { top: 20, bottom: 20 },
+            rowPageBreak: 'auto' as const,
+            bodyStyles: {
+                ...pdfStyles.table.bodyStyles,
+                minCellHeight: 8,
+                cellPadding: 4
+            },
+            didDrawPage: (data: any) => {
+                // Add header to each new page
+                if (data.pageNumber > 1) {
+                    addHeaderToNewPage(pdf, data.pageNumber, data.pageCount);
+                }
+                // Update current Y position
+                currentY = data.cursor.y;
+            },
+            didDrawCell: (data: any) => {
+                // Handle cell content overflow
+                if (data.cell.height > 20) {
+                    data.cell.styles.cellPadding = 2;
                 }
             }
-        })
+        };
 
-        // Remove the clone after capturing
-        document.body.removeChild(clone)
+        // Add table with auto-pagination
+        await autoTable(pdf, tableConfig);
+        currentY = (pdf as any).lastAutoTable.finalY + 20;
 
-        const imgData = canvas.toDataURL('image/jpeg', 1.0)
-        const pdf = new jsPDF({
-            orientation: 'landscape',
-            unit: 'mm',
-            format: 'a4'
-        })
+        // Get user information
+        const reportData = reportElement.getAttribute('data-report');
+        const report = reportData ? JSON.parse(reportData) : null;
 
-        const pdfWidth = pdf.internal.pageSize.getWidth()
-        const pdfHeight = pdf.internal.pageSize.getHeight()
-        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight)
-        pdf.save(filename)
+        // Check if we need a new page for footer
+        checkForNewPage(80); // Reserve space for footer section
 
-        if (onExportEnd) onExportEnd()
+        // Footer section
+        const leftColumn = 15;
+        const rightColumn = pageWidth / 2;
+
+        pdf.setFontSize(pdfStyles.fonts.normal);
+        pdf.text('PREPARED BY:', leftColumn, currentY);
+        pdf.text('APPROVED:', rightColumn, currentY);
+        currentY += 10;
+
+        // Add preparer details
+        pdf.setFontSize(pdfStyles.fonts.subHeader);
+        pdf.text(report?.preparer_name || '', leftColumn, currentY);
+        pdf.setFontSize(pdfStyles.fonts.normal);
+        pdf.text('PESO MANAGER - Designate', leftColumn, currentY + 5);
+
+        // Add approver details
+        pdf.setFontSize(pdfStyles.fonts.subHeader);
+        pdf.text(`HON. ${report?.mayor_name || ''}`, rightColumn, currentY);
+        pdf.setFontSize(pdfStyles.fonts.normal);
+        pdf.text('MUNICIPAL MAYOR', rightColumn, currentY + 5);
+        currentY += 20;
+
+        // Add dates
+        const currentDate = format(new Date(), 'dd-MMM-yy');
+        pdf.text(currentDate, leftColumn, currentY);
+        pdf.text('_______________________________________', rightColumn, currentY);
+        pdf.text('Date', leftColumn, currentY + 5);
+        pdf.text('Date', rightColumn, currentY + 5);
+        currentY += 15;
+
+        // Check if we need a new page for the note
+        checkForNewPage(20);
+
+        // Add note at the bottom
+        pdf.setFontSize(pdfStyles.fonts.small);
+        const splitNote = pdf.splitTextToSize(note, pageWidth - 30);
+        pdf.text(splitNote, 15, currentY);
+
+        // Save the PDF
+        pdf.save(filename);
+
+        if (onExportEnd) onExportEnd();
     } catch (error) {
-        console.error('Error exporting PDF:', error)
-        if (onExportEnd) onExportEnd()
+        console.error('Error exporting PDF:', error);
+        if (onExportEnd) onExportEnd();
+        throw error;
     }
-} 
+}; 

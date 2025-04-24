@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { reportService } from '@/services/reportService';
 import { toast } from 'react-hot-toast';
-import { ProgramType } from "@/types/database.types";
+import { ProgramType, EmploymentFacilitation } from "@/types/database.types";
 
 // Import types from a shared location
 import {
@@ -15,6 +15,17 @@ import {
   IndicatorOption,
   IndicatorOptionsMap
 } from '@/types/report.types';
+
+// New type for submission data
+interface EmploymentFacilitationSubmission {
+  program: ProgramType;
+  indicator: string;
+  sub_indicator: string;
+  sub_sub_indicator: string;
+  previous_report_period: number;
+  current_period: number;
+  remarks?: string;
+}
 
 export default function ReportPage() {
   const { user } = useAuth();
@@ -133,26 +144,76 @@ export default function ReportPage() {
     setLoading(true);
 
     try {
-      const isValid = formData.employmentFacilitation.every(entry =>
-        isValidProgram(entry.program)
-      );
+      // Process and structure the employment facilitation data
+      const processedEntries: EmploymentFacilitationSubmission[] = [];
 
-      if (!isValid) {
-        throw new Error('Some programs in your report are not valid. Please check your selections.');
-      }
+      // Create entries for ALL programs
+      programOptions.forEach(programOption => {
+        const program = programOption.value as ProgramType;
+        const selectedEntry = formData.employmentFacilitation.find(entry => entry.program === program);
+
+        // Get all possible indicators for this program
+        const possibleIndicators = indicatorOptions[program] || [];
+
+        possibleIndicators.forEach(ind => {
+          const isIndicatorSelected = selectedEntry?.indicator === ind.value;
+
+          // Get all possible sub-indicators for this indicator
+          const possibleSubIndicators = subIndicatorOptions[ind.value] || [];
+
+          if (possibleSubIndicators.length > 0) {
+            possibleSubIndicators.forEach(subInd => {
+              const isSubIndicatorSelected = isIndicatorSelected && selectedEntry?.sub_indicator === subInd.value;
+
+              // Get all possible sub-sub-indicators for this sub-indicator
+              const possibleSubSubIndicators = subIndicatorOptions[subInd.value] || [];
+
+              if (possibleSubSubIndicators.length > 0) {
+                possibleSubSubIndicators.forEach(subSubInd => {
+                  const isFullySelected = isSubIndicatorSelected && selectedEntry?.sub_sub_indicator === subSubInd.value;
+
+                  processedEntries.push({
+                    program,
+                    indicator: ind.value,
+                    sub_indicator: subInd.value,
+                    sub_sub_indicator: subSubInd.value,
+                    previous_report_period: isFullySelected ? selectedEntry.previous_report_period : 0,
+                    current_period: isFullySelected ? selectedEntry.current_period : 0,
+                    remarks: isFullySelected ? (selectedEntry.remarks || "") : ""
+                  });
+                });
+              } else {
+                // No sub-sub-indicators available
+                processedEntries.push({
+                  program,
+                  indicator: ind.value,
+                  sub_indicator: subInd.value,
+                  sub_sub_indicator: "",
+                  previous_report_period: isSubIndicatorSelected ? selectedEntry.previous_report_period : 0,
+                  current_period: isSubIndicatorSelected ? selectedEntry.current_period : 0,
+                  remarks: isSubIndicatorSelected ? (selectedEntry.remarks || "") : ""
+                });
+              }
+            });
+          } else {
+            // No sub-indicators available
+            processedEntries.push({
+              program,
+              indicator: ind.value,
+              sub_indicator: "",
+              sub_sub_indicator: "",
+              previous_report_period: isIndicatorSelected ? selectedEntry.previous_report_period : 0,
+              current_period: isIndicatorSelected ? selectedEntry.current_period : 0,
+              remarks: isIndicatorSelected ? (selectedEntry.remarks || "") : ""
+            });
+          }
+        });
+      });
 
       const result = await reportService.createReport(
         formData.reportingPeriod,
         formData.reportingOffice,
-        formData.employmentFacilitation.map(entry => ({
-          program: entry.program,
-          indicator: entry.indicator,
-          sub_indicator: entry.sub_indicator,
-          sub_sub_indicator: entry.sub_sub_indicator,
-          previous_report_period: entry.previous_report_period,
-          current_period: entry.current_period,
-          remarks: entry.remarks
-        }))
+        processedEntries
       );
 
       if (result) {

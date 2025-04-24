@@ -108,14 +108,20 @@ export default function ReportEntryPage() {
   }, [router, user?.email])
 
   const handleExportPDF = async (reportElement: HTMLElement, index: number) => {
-    const filename = `report-${reportData?.[index].reporting_period || 'report'}.pdf`
-    await exportToPDF(
-      reportElement,
-      filename,
-      () => setExportingReport(true),
-      () => setExportingReport(false),
-      false
-    )
+    try {
+      const filename = `report-${reportData?.[index].reporting_period || 'report'}.pdf`
+      await exportToPDF(
+        reportElement,
+        filename,
+        () => setExportingReport(true),
+        () => setExportingReport(false),
+        false
+      )
+    } catch (error) {
+      console.error('Failed to export PDF:', error)
+      // You could add a toast notification or alert here
+      alert('Failed to export PDF. Please try again.')
+    }
   }
 
   const handleExportSummary = async (summaryElement: HTMLElement, index: number) => {
