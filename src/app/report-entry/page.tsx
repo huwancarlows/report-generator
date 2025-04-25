@@ -246,6 +246,15 @@ export default function ReportEntryPage() {
     return summary;
   };
 
+  const formatIndicatorName = (name: string) => {
+    if (!name) return '';
+    // Split by underscore and convert to title case
+    return name.toLowerCase()
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -380,17 +389,17 @@ export default function ReportEntryPage() {
                         <td className="px-6 py-4">I</td>
                         <td className="px-6 py-4">
                           <div className="space-y-3">
-                            <div className="font-medium text-gray-900">{entry.program}</div>
-                            <div className="text-sm text-gray-600">{entry.indicator}</div>
+                            <div className="font-medium text-gray-900">{formatIndicatorName(entry.program)}</div>
+                            <div className="text-sm text-gray-600">{formatIndicatorName(entry.indicator)}</div>
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="space-y-3">
                             {entry.sub_indicator && (
-                              <div className="text-sm text-gray-600">{entry.sub_indicator}</div>
+                              <div className="text-sm text-gray-600">{formatIndicatorName(entry.sub_indicator)}</div>
                             )}
                             {entry.sub_sub_indicator && (
-                              <div className="text-sm text-gray-500">{entry.sub_sub_indicator}</div>
+                              <div className="text-sm text-gray-500">{formatIndicatorName(entry.sub_sub_indicator)}</div>
                             )}
                           </div>
                         </td>

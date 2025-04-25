@@ -78,7 +78,7 @@ export const pdfStyles: PDFStyles = {
 };
 
 export const tableHeaders = [
-    ['KRA', 'PROGRAM', 'INDICATOR', 'PREVIOUS REPORTING PERIOD', 'CURRENT REPORTING PERIOD'],
+    ['KRA', 'INDICATOR', 'OTHER SPECIFICATION', 'PREVIOUS REPORTING PERIOD', 'CURRENT REPORTING PERIOD'],
     ['', '', '(OUTPUT SPECIFICATION)', '', '']
 ];
 

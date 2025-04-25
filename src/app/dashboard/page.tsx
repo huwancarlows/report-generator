@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
 import html2canvas from 'html2canvas';
+import { getDashboardData } from '@/data/mockDashboardData';
 
 // Register ChartJS components
 ChartJS.register(
@@ -131,6 +132,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('2024');
+  const [dashboardData, setDashboardData] = useState(getDashboardData('2024'));
   const dashboardRef = useRef<HTMLDivElement>(null);
   const chartRefs = {
     performance: useRef<HTMLDivElement>(null),
@@ -148,6 +150,10 @@ export default function DashboardPage() {
       setUser(storedUser);
     }
   }, [router]);
+
+  useEffect(() => {
+    setDashboardData(getDashboardData(selectedPeriod));
+  }, [selectedPeriod]);
 
   const handleExportDashboard = async () => {
     setIsExporting(true);
@@ -215,113 +221,6 @@ export default function DashboardPage() {
   };
 
   if (!user) return null;
-
-  // Update the monthly data to reflect PESO metrics
-  const monthlyData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-    datasets: [
-      {
-        label: 'Solicited Vacancies',
-        data: [320, 350, 380, 400, 420, 450, 480, 500, 520, 550, 580, 600],
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.1)',
-        tension: 0.4,
-        pointRadius: 4,
-        pointBackgroundColor: '#2563eb',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 2,
-        fill: true
-      },
-      {
-        label: 'Registered Applicants',
-        data: [280, 310, 340, 360, 380, 410, 440, 460, 480, 510, 540, 570],
-        borderColor: '#059669',
-        backgroundColor: 'rgba(5, 150, 105, 0.1)',
-        tension: 0.4,
-        pointRadius: 4,
-        pointBackgroundColor: '#059669',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 2,
-        fill: true
-      },
-      {
-        label: 'Referred Applicants',
-        data: [240, 270, 300, 320, 340, 370, 400, 420, 440, 470, 500, 530],
-        borderColor: '#d97706',
-        backgroundColor: 'rgba(217, 119, 6, 0.1)',
-        tension: 0.4,
-        pointRadius: 4,
-        pointBackgroundColor: '#d97706',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 2,
-        fill: true
-      },
-      {
-        label: 'Placed Applicants',
-        data: [200, 230, 260, 280, 300, 330, 360, 380, 400, 430, 460, 490],
-        borderColor: '#dc2626',
-        backgroundColor: 'rgba(220, 38, 38, 0.1)',
-        tension: 0.4,
-        pointRadius: 4,
-        pointBackgroundColor: '#dc2626',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 2,
-        fill: true
-      }
-    ]
-  };
-
-  const topJobsData = {
-    labels: [
-      'IT Professionals',
-      'Healthcare Workers',
-      'Customer Service Representatives',
-      'Sales Professionals',
-      'Administrative Staff',
-      'Engineers',
-      'Teachers/Trainers',
-      'Skilled Trade Workers',
-      'Financial Analysts',
-      'Digital Marketing Specialists'
-    ],
-    datasets: [{
-      label: 'Available Positions',
-      data: [850, 720, 680, 590, 520, 480, 420, 380, 350, 320],
-      backgroundColor: '#2563eb',
-      borderColor: '#1e40af',
-      borderWidth: 1,
-    }]
-  };
-
-  const genderData = {
-    labels: ['Male', 'Female'],
-    datasets: [{
-      data: [52, 48],
-      backgroundColor: ['#2563eb', '#db2777'],
-      borderColor: ['#1e40af', '#be185d'],
-      borderWidth: 1,
-    }]
-  };
-
-  const educationData = {
-    labels: ['College Degree', 'Vocational', 'High School', 'Post-Graduate'],
-    datasets: [{
-      data: [45, 25, 20, 10],
-      backgroundColor: ['#2563eb', '#059669', '#d97706', '#7c3aed'],
-      borderColor: ['#1e40af', '#047857', '#b45309', '#5b21b6'],
-      borderWidth: 1,
-    }]
-  };
-
-  const sectorData = {
-    labels: ['Private Sector', 'Government', 'NGO/Non-Profit'],
-    datasets: [{
-      data: [65, 25, 10],
-      backgroundColor: ['#2563eb', '#059669', '#7c3aed'],
-      borderColor: ['#1e40af', '#047857', '#5b21b6'],
-      borderWidth: 1,
-    }]
-  };
 
   const commonChartOptions: CommonChartOptions = {
     responsive: true,
@@ -487,8 +386,8 @@ export default function DashboardPage() {
               </div>
               <div className="ml-4">
                 <h3 className="text-sm font-medium text-gray-500">Solicited Vacancies</h3>
-                <p className="text-2xl font-bold text-gray-900">5,550</p>
-                <p className="text-sm text-green-600">↑ 12.5% vs last month</p>
+                <p className="text-2xl font-bold text-gray-900">{dashboardData.quickStats.solicitedVacancies.value}</p>
+                <p className="text-sm text-green-600">↑ {dashboardData.quickStats.solicitedVacancies.change}% vs last month</p>
               </div>
             </div>
           </div>
@@ -501,8 +400,8 @@ export default function DashboardPage() {
               </div>
               <div className="ml-4">
                 <h3 className="text-sm font-medium text-gray-500">Registered Applicants</h3>
-                <p className="text-2xl font-bold text-gray-900">4,890</p>
-                <p className="text-sm text-green-600">↑ 8.3% vs last month</p>
+                <p className="text-2xl font-bold text-gray-900">{dashboardData.quickStats.registeredApplicants.value}</p>
+                <p className="text-sm text-green-600">↑ {dashboardData.quickStats.registeredApplicants.change}% vs last month</p>
               </div>
             </div>
           </div>
@@ -515,8 +414,8 @@ export default function DashboardPage() {
               </div>
               <div className="ml-4">
                 <h3 className="text-sm font-medium text-gray-500">Referred Applicants</h3>
-                <p className="text-2xl font-bold text-gray-900">4,230</p>
-                <p className="text-sm text-green-600">↑ 6.7% vs last month</p>
+                <p className="text-2xl font-bold text-gray-900">{dashboardData.quickStats.referredApplicants.value}</p>
+                <p className="text-sm text-green-600">↑ {dashboardData.quickStats.referredApplicants.change}% vs last month</p>
               </div>
             </div>
           </div>
@@ -529,8 +428,8 @@ export default function DashboardPage() {
               </div>
               <div className="ml-4">
                 <h3 className="text-sm font-medium text-gray-500">Placed Applicants</h3>
-                <p className="text-2xl font-bold text-gray-900">3,890</p>
-                <p className="text-sm text-green-600">↑ 5.2% vs last month</p>
+                <p className="text-2xl font-bold text-gray-900">{dashboardData.quickStats.placedApplicants.value}</p>
+                <p className="text-sm text-green-600">↑ {dashboardData.quickStats.placedApplicants.change}% vs last month</p>
               </div>
             </div>
           </div>
@@ -553,7 +452,7 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="h-[400px]">
-              <Line data={monthlyData} options={lineChartOptions} />
+              <Line data={dashboardData.monthlyData} options={lineChartOptions} />
             </div>
           </section>
 
@@ -573,7 +472,7 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="h-[400px]">
-              <Bar data={topJobsData} options={barChartOptions} />
+              <Bar data={dashboardData.topJobsData} options={barChartOptions} />
             </div>
           </section>
 
@@ -595,7 +494,7 @@ export default function DashboardPage() {
                 </button>
               </div>
               <div className="h-[300px]">
-                <Pie data={genderData} options={pieChartOptions} />
+                <Pie data={dashboardData.genderData} options={pieChartOptions} />
               </div>
             </section>
 
@@ -615,7 +514,7 @@ export default function DashboardPage() {
                 </button>
               </div>
               <div className="h-[300px]">
-                <Pie data={educationData} options={pieChartOptions} />
+                <Pie data={dashboardData.educationData} options={pieChartOptions} />
               </div>
             </section>
 
@@ -632,10 +531,10 @@ export default function DashboardPage() {
                   className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
                 >
                   {isExporting ? 'Exporting...' : 'Export'}
-                </button>x``
+                </button>
               </div>
               <div className="h-[300px]">
-                <Pie data={sectorData} options={pieChartOptions} />
+                <Pie data={dashboardData.sectorData} options={pieChartOptions} />
               </div>
             </section>
           </div>
