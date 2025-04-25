@@ -50,22 +50,27 @@ export const pdfStyles: PDFStyles = {
             halign: 'center'
         },
         columnStyles: {
-            0: { cellWidth: 20 }, // KRA
-            1: { cellWidth: 30 }, // PROGRAM
-            2: { cellWidth: 70 }, // INDICATOR
-            3: { cellWidth: 35, halign: 'center' }, // PREVIOUS
-            4: { cellWidth: 35, halign: 'center' } // CURRENT
+            0: { cellWidth: 15 }, // KRA
+            1: { cellWidth: 45 }, // PROGRAM/INDICATOR
+            2: { cellWidth: 80 }, // OTHER SPECIFICATION
+            3: { cellWidth: 25, halign: 'center' as const }, // PREVIOUS
+            4: { cellWidth: 25, halign: 'center' as const } // CURRENT
         },
         margin: { left: 15, right: 15 },
         showFoot: 'lastPage',
         rowPageBreak: 'auto',
         bodyStyles: {
-            minCellHeight: 6
+            minCellHeight: 6,
+            valign: 'top' // Align content to top of cell
         },
-        didParseCell: function (data) {
+        didParseCell: function (data: any) {
             // Ensure text wrapping for long content
-            if (data.cell.raw && typeof data.cell.raw === 'string' && data.cell.raw.length > 50) {
+            if (data.cell.raw && typeof data.cell.raw === 'string') {
                 data.cell.styles.cellWidth = 'wrap';
+                // Align program/indicator and specification cells to top
+                if (data.column.index === 1 || data.column.index === 2) {
+                    data.cell.styles.valign = 'top';
+                }
             }
         }
     },
@@ -78,8 +83,8 @@ export const pdfStyles: PDFStyles = {
 };
 
 export const tableHeaders = [
-    ['KRA', 'INDICATOR', 'OTHER SPECIFICATION', 'PREVIOUS REPORTING PERIOD', 'CURRENT REPORTING PERIOD'],
-    ['', '', '(OUTPUT SPECIFICATION)', '', '']
+    ['KRA', 'INDICATOR', 'OTHER SPECIFICATION', 'PREVIOUS', 'CURRENT'],
+    ['', '', '(OUTPUT SPECIFICATION)', 'REPORTING PERIOD', 'REPORTING PERIOD']
 ];
 
 export const instructions = 'GENERAL INSTRUCTIONS: Provide complete information to this form. Data contained herein should be the total information for the Regional Office, its provincial extension units and district offices. Unless otherwise stated, data required is for the reference month. The reference month covers the first day up to its last day.';

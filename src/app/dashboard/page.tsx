@@ -337,7 +337,7 @@ export default function DashboardPage() {
         {/* Dashboard Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">PESO Employment Analytics Dashboard</h1>
+            <h1 className="text-3xl font-bold text-gray-900">PESO Employment Analytics Chart</h1>
             <p className="mt-2 text-gray-600">Cumulative Performance of 26 PESO Employment Report per LGU</p>
           </div>
           <div className="flex items-center gap-4">

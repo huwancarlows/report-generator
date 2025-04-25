@@ -62,10 +62,35 @@ const extractTableData = (table: HTMLTableElement) => {
     // Extract data rows
     const rows = table.querySelectorAll('tbody tr')
     rows.forEach(row => {
+        const cells = row.querySelectorAll('td')
         const rowData: string[] = []
-        row.querySelectorAll('td').forEach(cell => {
-            rowData.push(cell.textContent?.trim() || '')
+
+        cells.forEach((cell, index) => {
+            if (index === 2) { // This is the specifications column
+                const specDivs = cell.querySelectorAll('div div')
+                const primarySpec = specDivs[0]?.textContent?.trim() || ''
+                const secondarySpec = specDivs[1]?.textContent?.trim() || ''
+                // Format specifications with proper spacing
+                const combinedSpec = secondarySpec
+                    ? `${primarySpec}\n\n${secondarySpec}`  // Add extra line break between specs
+                    : primarySpec
+                rowData.push(combinedSpec)
+            } else if (index === 1) {
+                // Format program/indicator with proper spacing
+                const program = cell.querySelector('div:first-child')?.textContent?.trim() || ''
+                const indicator = cell.querySelector('div:last-child')?.textContent?.trim() || ''
+                // Split program and indicator into separate lines with extra spacing
+                const formattedProgram = program.split(' ').join('\n')
+                const formattedIndicator = indicator.split(' ').join('\n')
+                rowData.push(`${formattedProgram}\n\n${formattedIndicator}`)  // Add extra line break between program and indicator
+            } else if (index === 0) {
+                rowData.push(cell.textContent?.trim() || '')
+            } else if (index === 3 || index === 4) {
+                // For numeric columns, just add the value
+                rowData.push(cell.textContent?.trim() || '0')
+            }
         })
+
         data.push(rowData)
     })
 
@@ -80,7 +105,7 @@ const extractTextContent = (element: HTMLElement): string => {
         scripts[0].parentNode?.removeChild(scripts[0])
     }
 
-    // Get text content
+    // Get text conte
     return clone.textContent?.trim() || ''
 }
 
@@ -246,36 +271,33 @@ export const exportToPDF = async (
 
         // Extract and format table data
         const { data } = extractTableData(reportElement.querySelector('table')!);
-        const formattedData = data.map(row => {
-            while (row.length < 5) row.push('');
-            return row;
-        });
 
-        // Enhanced table configuration for better pagination
+        // Enhanced table configuration
         const tableConfig = {
             ...pdfStyles.table,
             head: tableHeaders,
-            body: formattedData,
+            body: data,
             startY: currentY,
             margin: { top: 20, bottom: 20 },
             rowPageBreak: 'auto' as const,
             bodyStyles: {
                 ...pdfStyles.table.bodyStyles,
-                minCellHeight: 8,
-                cellPadding: 4
+                minCellHeight: 16, // Increased minimum height for better spacing
+                cellPadding: [3, 3, 3, 3] // Equal padding on all sides
             },
             didDrawPage: (data: any) => {
-                // Add header to each new page
                 if (data.pageNumber > 1) {
                     addHeaderToNewPage(pdf, data.pageNumber, data.pageCount);
                 }
-                // Update current Y position
                 currentY = data.cursor.y;
             },
             didDrawCell: (data: any) => {
-                // Handle cell content overflow
-                if (data.cell.height > 20) {
-                    data.cell.styles.cellPadding = 2;
+                // Adjust cell padding based on content
+                if (data.cell.text && typeof data.cell.text === 'string') {
+                    const lines = data.cell.text.split('\n');
+                    if (lines.length > 1) {
+                        data.cell.styles.cellPadding = [3, 3, 3, 3];
+                    }
                 }
             }
         };
