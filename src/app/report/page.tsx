@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { reportService } from '@/services/reportService';
@@ -16,28 +16,9 @@ import {
   IndicatorOptionsMap
 } from '@/types/report.types';
 
-// New type for submission data
-interface EmploymentFacilitationSubmission {
-  program: ProgramType;
-  indicator: string;
-  sub_indicator: string;
-  sub_sub_indicator: string;
-  previous_report_period: number;
-  current_period: number;
-  remarks?: string;
-}
-
 export default function ReportPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<{
-    [key: string]: string;
-  }>({});
-  const [showValidationErrors, setShowValidationErrors] = useState(true);
 
   // Initial form state
   const initialFormState: ReportData = {
@@ -56,6 +37,14 @@ export default function ReportPage() {
     reportingOffice: ""
   };
 
+  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<{
+    [key: string]: string;
+  }>({});
+  const [showValidationErrors, setShowValidationErrors] = useState(true);
   const [formData, setFormData] = useState<ReportData>(initialFormState);
 
   // Reset form to initial state
@@ -81,175 +70,6 @@ export default function ReportPage() {
     }));
   }, [router]);
 
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-
-    // Basic validation with friendly messages
-    if (!formData.reportingPeriod) {
-      newErrors.reportingPeriod = "📅 Select which month you're reporting for";
-    }
-
-    if (!formData.reportingOffice) {
-      newErrors.reportingOffice = "🏢 Enter your office location";
-    }
-
-    // Enhanced validation for entries with friendly messages
-    formData.employmentFacilitation.forEach((row, index) => {
-      const rowNumber = index + 1;
-
-      if (!row.program) {
-        newErrors[`row${index}_program`] = `Entry ${rowNumber}: Choose a program type`;
-      }
-      if (!row.indicator) {
-        newErrors[`row${index}_indicator`] = `Entry ${rowNumber}: Select what you're measuring`;
-      }
-      if (row.previous_report_period < 0) {
-        newErrors[`row${index}_previous`] = `Entry ${rowNumber}: Numbers can't be negative`;
-      }
-      if (row.current_period < 0) {
-        newErrors[`row${index}_current`] = `Entry ${rowNumber}: Numbers can't be negative`;
-      }
-
-      if (row.program && indicatorOptions[row.program] && !row.indicator) {
-        const programLabel = programOptions.find(p => p.value === row.program)?.label.split('.')[1] || 'this program';
-        newErrors[`row${index}_indicator`] = `Entry ${rowNumber}: Add details for ${programLabel}`;
-      }
-      if (row.indicator && subIndicatorOptions[row.indicator] && !row.sub_indicator) {
-        const indicatorLabel = indicatorOptions[row.program]?.find(i => i.value === row.indicator)?.label.split('.')[1] || 'this item';
-        newErrors[`row${index}_sub_indicator`] = `Entry ${rowNumber}: Add more details for ${indicatorLabel}`;
-      }
-    });
-
-    setValidationErrors(newErrors);
-    setShowValidationErrors(true);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (isSubmitting) {
-      return;
-    }
-
-    setSubmitError(null);
-    setSubmitSuccess(false);
-
-    if (!validateForm()) {
-      toast.error('Please complete all required fields before submitting');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setLoading(true);
-
-    try {
-      // Process and structure the employment facilitation data
-      const processedEntries: EmploymentFacilitationSubmission[] = [];
-
-      // Create entries for ALL programs
-      programOptions.forEach(programOption => {
-        const program = programOption.value as ProgramType;
-        const selectedEntry = formData.employmentFacilitation.find(entry => entry.program === program);
-
-        // Get all possible indicators for this program
-        const possibleIndicators = indicatorOptions[program] || [];
-
-        possibleIndicators.forEach(ind => {
-          const isIndicatorSelected = selectedEntry?.indicator === ind.value;
-
-          // Get all possible sub-indicators for this indicator
-          const possibleSubIndicators = subIndicatorOptions[ind.value] || [];
-
-          if (possibleSubIndicators.length > 0) {
-            possibleSubIndicators.forEach(subInd => {
-              const isSubIndicatorSelected = isIndicatorSelected && selectedEntry?.sub_indicator === subInd.value;
-
-              // Get all possible sub-sub-indicators for this sub-indicator
-              const possibleSubSubIndicators = subIndicatorOptions[subInd.value] || [];
-
-              if (possibleSubSubIndicators.length > 0) {
-                possibleSubSubIndicators.forEach(subSubInd => {
-                  const isFullySelected = isSubIndicatorSelected && selectedEntry?.sub_sub_indicator === subSubInd.value;
-
-                  processedEntries.push({
-                    program,
-                    indicator: ind.value,
-                    sub_indicator: subInd.value,
-                    sub_sub_indicator: subSubInd.value,
-                    previous_report_period: isFullySelected ? selectedEntry.previous_report_period : 0,
-                    current_period: isFullySelected ? selectedEntry.current_period : 0,
-                    remarks: isFullySelected ? (selectedEntry.remarks || "") : ""
-                  });
-                });
-              } else {
-                // No sub-sub-indicators available
-                processedEntries.push({
-                  program,
-                  indicator: ind.value,
-                  sub_indicator: subInd.value,
-                  sub_sub_indicator: "",
-                  previous_report_period: isSubIndicatorSelected ? selectedEntry.previous_report_period : 0,
-                  current_period: isSubIndicatorSelected ? selectedEntry.current_period : 0,
-                  remarks: isSubIndicatorSelected ? (selectedEntry.remarks || "") : ""
-                });
-              }
-            });
-          } else {
-            // No sub-indicators available
-            processedEntries.push({
-              program,
-              indicator: ind.value,
-              sub_indicator: "",
-              sub_sub_indicator: "",
-              previous_report_period: isIndicatorSelected ? selectedEntry.previous_report_period : 0,
-              current_period: isIndicatorSelected ? selectedEntry.current_period : 0,
-              remarks: isIndicatorSelected ? (selectedEntry.remarks || "") : ""
-            });
-          }
-        });
-      });
-
-      const result = await reportService.createReport(
-        formData.reportingPeriod,
-        formData.reportingOffice,
-        processedEntries
-      );
-
-      if (result) {
-        setSubmitSuccess(true);
-        toast.success('Your report has been successfully submitted!');
-        resetForm();
-      } else {
-        throw new Error('Unable to save your report. Please try again or contact support if the problem persists.');
-      }
-    } catch (error) {
-      console.error('Error saving report:', error);
-      let errorMessage = 'We encountered an issue while saving your report. ';
-
-      if (error instanceof Error) {
-        if (error.message.includes('network') || error.message.includes('connection')) {
-          errorMessage += 'Please check your internet connection and try again.';
-        } else if (error.message.includes('timeout')) {
-          errorMessage += 'The request timed out. Please try again.';
-        } else if (error.message.includes('unauthorized')) {
-          errorMessage += 'Your session may have expired. Please log in again.';
-        } else {
-          errorMessage += error.message;
-        }
-      } else {
-        errorMessage += 'Please try again or contact support if the problem persists.';
-      }
-
-      setSubmitError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-      setIsSubmitting(false);
-    }
-  };
-
-  // Validation function for ProgramType
   const isValidProgram = (program: string): program is ProgramType => {
     return [
       'JOB_VACANCIES',
@@ -266,24 +86,292 @@ export default function ReportPage() {
     ].includes(program);
   };
 
+  const validateForm = () => {
+    const newErrors: { [key: string]: string } = {};
+
+    // Basic validation with friendly messages
+    if (!formData.reportingPeriod) {
+      newErrors.reportingPeriod = "📅 Please select a reporting period";
+    }
+
+    if (!formData.reportingOffice) {
+      newErrors.reportingOffice = "🏢 Please enter your reporting office";
+    }
+
+    // Validate that all numbers are non-negative
+    formData.employmentFacilitation.forEach((entry: EmploymentFacilitationRow, index: number) => {
+      const rowNumber = index + 1;
+
+      if (entry.previous_report_period < 0) {
+        newErrors[`row${index}_previous`] = `Entry ${rowNumber}: Numbers can't be negative`;
+      }
+      if (entry.current_period < 0) {
+        newErrors[`row${index}_current`] = `Entry ${rowNumber}: Numbers can't be negative`;
+      }
+      if ((entry.previous_female_count ?? 0) < 0) {
+        newErrors[`row${index}_previous_female`] = `Entry ${rowNumber}: Female count can't be negative`;
+      }
+      if ((entry.current_female_count ?? 0) < 0) {
+        newErrors[`row${index}_current_female`] = `Entry ${rowNumber}: Female count can't be negative`;
+      }
+      // Validate that female counts don't exceed total counts
+      if ((entry.previous_female_count ?? 0) > entry.previous_report_period) {
+        newErrors[`row${index}_previous_female`] = `Entry ${rowNumber}: Female count can't exceed total count`;
+      }
+      if ((entry.current_female_count ?? 0) > entry.current_period) {
+        newErrors[`row${index}_current_female`] = `Entry ${rowNumber}: Female count can't exceed total count`;
+      }
+    });
+
+    setValidationErrors(newErrors);
+    setShowValidationErrors(true);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
+
+    // Validate form before submission
+    if (!validateForm()) {
+      toast.error("Please fix the errors in the form before submitting");
+      return;
+    }
+
+    setSubmitError(null);
+    setSubmitSuccess(false);
+    setIsSubmitting(true);
+    setLoading(true);
+
+    try {
+      // Process and structure the employment facilitation data
+      const processedEntries: Omit<EmploymentFacilitation, 'id' | 'report_id'>[] = [];
+
+      // Helper function to check if an entry is a female sub-entry
+      const isFemaleSubEntry = (label: string) => {
+        // Check for patterns like "X.X.1 Female" where X is any number
+        const femalePattern = /\d+\.\d+\.1\s+Female$/;
+        return femalePattern.test(label);
+      };
+
+      // Process all programs
+      programOptions.forEach(programOption => {
+        const program = programOption.value;
+        const indicators = indicatorOptions[program] || [];
+
+        // Process each indicator for this program
+        indicators.forEach(indicator => {
+          const subIndicators = subIndicatorOptions[indicator.value] || [];
+
+          if (subIndicators.length > 0) {
+            // Process sub-indicators
+            subIndicators.forEach(subInd => {
+              // Find the matching entry in formData
+              const mainEntry = formData.employmentFacilitation.find(
+                entry => entry.program === program &&
+                  entry.indicator === indicator.value &&
+                  entry.sub_indicator === subInd.value &&
+                  !entry.sub_sub_indicator
+              );
+
+              // Check if this is a female sub-entry by its label pattern
+              if (isFemaleSubEntry(subInd.label)) {
+                // This is a female entry (like 3.5.1 Female)
+                // Find the parent entry to get the main counts
+                const parentEntry = formData.employmentFacilitation.find(
+                  entry => entry.program === program &&
+                    entry.indicator === indicator.value &&
+                    !entry.sub_indicator
+                );
+
+                processedEntries.push({
+                  program,
+                  indicator: indicator.value,
+                  sub_indicator: subInd.value,
+                  sub_sub_indicator: 'FEMALE',
+                  previous_report_period: mainEntry?.previous_female_count || 0,
+                  current_period: mainEntry?.current_female_count || 0,
+                  remarks: mainEntry?.remarks || null
+                });
+              } else {
+                // Regular entry
+                processedEntries.push({
+                  program,
+                  indicator: indicator.value,
+                  sub_indicator: subInd.value,
+                  sub_sub_indicator: null,
+                  previous_report_period: mainEntry?.previous_report_period || 0,
+                  current_period: mainEntry?.current_period || 0,
+                  remarks: mainEntry?.remarks || null
+                });
+
+                // Check for explicit FEMALE sub-sub-indicators
+                const subSubIndicators = subIndicatorOptions[subInd.value] || [];
+                if (subSubIndicators.some(s => s.value === 'FEMALE')) {
+                  const femaleEntry = formData.employmentFacilitation.find(
+                    entry => entry.program === program &&
+                      entry.indicator === indicator.value &&
+                      entry.sub_indicator === subInd.value &&
+                      entry.sub_sub_indicator === 'FEMALE'
+                  );
+
+                  processedEntries.push({
+                    program,
+                    indicator: indicator.value,
+                    sub_indicator: subInd.value,
+                    sub_sub_indicator: 'FEMALE',
+                    previous_report_period: femaleEntry?.previous_female_count || 0,
+                    current_period: femaleEntry?.current_female_count || 0,
+                    remarks: femaleEntry?.remarks || null
+                  });
+                }
+              }
+            });
+          } else {
+            // No sub-indicators, just add the main indicator entry
+            const mainEntry = formData.employmentFacilitation.find(
+              entry => entry.program === program &&
+                entry.indicator === indicator.value &&
+                !entry.sub_indicator
+            );
+
+            processedEntries.push({
+              program,
+              indicator: indicator.value,
+              sub_indicator: null,
+              sub_sub_indicator: null,
+              previous_report_period: mainEntry?.previous_report_period || 0,
+              current_period: mainEntry?.current_period || 0,
+              remarks: mainEntry?.remarks || null
+            });
+          }
+        });
+      });
+
+      console.log('Form data state:', formData);
+      console.log('Final processed entries:', processedEntries);
+
+      // Call the report service to create the report
+      const result = await reportService.createReport(
+        formData.reportingPeriod || new Date().toISOString().slice(0, 7),
+        formData.reportingOffice || 'Default Office',
+        processedEntries
+      );
+
+      if (result) {
+        console.log('Submitted result:', result);
+        setSubmitSuccess(true);
+        toast.success('Report submitted successfully!');
+        // Reset form after successful submission
+        resetForm();
+      } else {
+        throw new Error('Failed to create report. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error saving report:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred while submitting the report';
+      setSubmitError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  const generateEntriesForProgram = (program: ProgramType): EmploymentFacilitationRow[] => {
+    const entries: EmploymentFacilitationRow[] = [];
+
+    // Get all indicators for the program
+    const indicators = indicatorOptions[program] || [];
+
+    indicators.forEach(indicator => {
+      const subIndicators = subIndicatorOptions[indicator.value] || [];
+
+      if (subIndicators.length > 0) {
+        // Has sub-indicators
+        subIndicators.forEach(subInd => {
+          const subSubIndicators = subIndicatorOptions[subInd.value] || [];
+
+          if (subSubIndicators.length > 0) {
+            // Has sub-sub-indicators
+            subSubIndicators.forEach(subSubInd => {
+              entries.push({
+                program,
+                indicator: indicator.value,
+                sub_indicator: subInd.value,
+                sub_sub_indicator: subSubInd.value,
+                previous_report_period: 0,
+                current_period: 0,
+                remarks: ""
+              });
+            });
+          } else {
+            // No sub-sub-indicators
+            entries.push({
+              program,
+              indicator: indicator.value,
+              sub_indicator: subInd.value,
+              sub_sub_indicator: "",
+              previous_report_period: 0,
+              current_period: 0,
+              remarks: ""
+            });
+          }
+        });
+      } else {
+        // No sub-indicators
+        entries.push({
+          program,
+          indicator: indicator.value,
+          sub_indicator: "",
+          sub_sub_indicator: "",
+          previous_report_period: 0,
+          current_period: 0,
+          remarks: ""
+        });
+      }
+    });
+
+    return entries;
+  };
+
   const updateRow = <K extends keyof EmploymentFacilitationRow>(
     index: number,
     field: K,
     value: FieldType<EmploymentFacilitationRow, K>
   ) => {
     const newData = { ...formData };
-    newData.employmentFacilitation[index][field] = value;
 
-    // Reset dependent fields when parent field changes
     if (field === "program") {
-      newData.employmentFacilitation[index].indicator = "";
-      newData.employmentFacilitation[index].sub_indicator = "";
-      newData.employmentFacilitation[index].sub_sub_indicator = "";
-    } else if (field === "indicator") {
-      newData.employmentFacilitation[index].sub_indicator = "";
-      newData.employmentFacilitation[index].sub_sub_indicator = "";
-    } else if (field === "sub_indicator") {
-      newData.employmentFacilitation[index].sub_sub_indicator = "";
+      // If selecting a program, generate all its entries
+      if (value) {
+        const programValue = value as ProgramType;
+        const entries = generateEntriesForProgram(programValue);
+
+        // Replace the current row with all generated entries
+        newData.employmentFacilitation = [
+          ...newData.employmentFacilitation.slice(0, index),
+          ...entries,
+          ...newData.employmentFacilitation.slice(index + 1)
+        ];
+      } else {
+        // If clearing program, just update the single row
+        newData.employmentFacilitation[index] = {
+          program: value as ProgramType,
+          indicator: "",
+          sub_indicator: "",
+          sub_sub_indicator: "",
+          previous_report_period: 0,
+          current_period: 0,
+          remarks: ""
+        };
+      }
+    } else {
+      // For other fields, just update the value
+      newData.employmentFacilitation[index][field] = value;
     }
 
     setFormData(newData);
@@ -716,50 +804,198 @@ export default function ReportPage() {
     }));
   };
 
+  const updateIndicatorValue = (
+    program: string,
+    indicator: string,
+    field: 'previous_report_period' | 'current_period',
+    value: number
+  ) => {
+    setFormData(prev => {
+      const newData = { ...prev };
+      const existingIndex = newData.employmentFacilitation.findIndex(
+        row => row.program === program && row.indicator === indicator && !row.sub_indicator
+      );
+
+      if (existingIndex === -1) {
+        // Add new entry
+        const newRow: EmploymentFacilitationRow = {
+          program: program as ProgramType,
+          indicator,
+          sub_indicator: "",
+          sub_sub_indicator: "",
+          previous_report_period: 0,
+          current_period: 0,
+          remarks: ""
+        };
+        newData.employmentFacilitation.push(newRow);
+        newData.employmentFacilitation[newData.employmentFacilitation.length - 1][field] = value;
+      } else {
+        // Update existing entry
+        newData.employmentFacilitation[existingIndex] = {
+          ...newData.employmentFacilitation[existingIndex],
+          [field]: value
+        };
+      }
+
+      return newData;
+    });
+  };
+
+  const updateSubIndicatorValue = (
+    program: string,
+    indicator: string,
+    subIndicator: string,
+    field: 'previous_report_period' | 'current_period',
+    value: number
+  ) => {
+    setFormData(prev => {
+      const newData = { ...prev };
+      const existingIndex = newData.employmentFacilitation.findIndex(
+        row => row.program === program &&
+          row.indicator === indicator &&
+          row.sub_indicator === subIndicator &&
+          !row.sub_sub_indicator
+      );
+
+      if (existingIndex === -1) {
+        // Add new entry
+        const newRow: EmploymentFacilitationRow = {
+          program: program as ProgramType,
+          indicator,
+          sub_indicator: subIndicator,
+          sub_sub_indicator: "",
+          previous_report_period: 0,
+          current_period: 0,
+          remarks: ""
+        };
+        newData.employmentFacilitation.push(newRow);
+        newData.employmentFacilitation[newData.employmentFacilitation.length - 1][field] = value;
+      } else {
+        // Update existing entry
+        newData.employmentFacilitation[existingIndex] = {
+          ...newData.employmentFacilitation[existingIndex],
+          [field]: value
+        };
+      }
+
+      return newData;
+    });
+  };
+
+  const updateSubSubIndicatorValue = (
+    program: string,
+    indicator: string,
+    subIndicator: string,
+    subSubIndicator: string,
+    field: 'previous_female_count' | 'current_female_count',
+    value: number
+  ) => {
+    setFormData(prev => {
+      const newData = { ...prev };
+      const existingIndex = newData.employmentFacilitation.findIndex(
+        row => row.program === program &&
+          row.indicator === indicator &&
+          row.sub_indicator === subIndicator &&
+          row.sub_sub_indicator === subSubIndicator
+      );
+
+      if (existingIndex === -1) {
+        // Add new entry
+        const newRow: EmploymentFacilitationRow = {
+          program: program as ProgramType,
+          indicator,
+          sub_indicator: subIndicator,
+          sub_sub_indicator: subSubIndicator,
+          previous_report_period: 0,
+          current_period: 0,
+          previous_female_count: 0,
+          current_female_count: 0,
+          remarks: ""
+        };
+        newData.employmentFacilitation.push(newRow);
+        newData.employmentFacilitation[newData.employmentFacilitation.length - 1][field] = value;
+      } else {
+        // Update existing entry
+        newData.employmentFacilitation[existingIndex] = {
+          ...newData.employmentFacilitation[existingIndex],
+          [field]: value
+        };
+      }
+
+      return newData;
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-8">
       <div className="max-w-[1400px] mx-auto px-4">
-        {/* Form Header with Card Style */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
-          <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-3xl font-bold text-gray-900">Department of Labor and Employment</h1>
-            <p className="text-lg mt-3 text-gray-600">Monthly Report on Implementation of Employment Programs</p>
-            <p className="text-sm text-gray-500 mt-2">Revised SPRPS Form 2003-1</p>
+        {/* Form Header with Enhanced Card Style */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-8 mb-8 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-blue-600"></div>
+          <div className="text-center max-w-3xl mx-auto relative">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Department of Labor and Employment</h1>
+            <p className="text-lg text-gray-600 mb-1">Monthly Report on Implementation of Employment Programs</p>
+            <p className="text-sm text-gray-500">Revised SPRPS Form 2003-1</p>
           </div>
 
-          {/* Report Period and Office Section */}
+          {/* Report Period and Office Section with Enhanced Styling */}
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Reporting Period</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <span className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Reporting Period
+                </span>
+              </label>
               <input
                 type="month"
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
                 value={formData.reportingPeriod}
                 onChange={(e) => setFormData({ ...formData, reportingPeriod: e.target.value })}
               />
               {validationErrors.reportingPeriod && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors.reportingPeriod}</p>
+                <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {validationErrors.reportingPeriod}
+                </p>
               )}
             </div>
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Reporting Office</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <span className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  Reporting Office
+                </span>
+              </label>
               <input
                 type="text"
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
                 value={formData.reportingOffice}
                 onChange={(e) => setFormData({ ...formData, reportingOffice: e.target.value })}
                 placeholder="Enter reporting office"
               />
               {validationErrors.reportingOffice && (
-                <p className="text-red-500 text-sm mt-1">{validationErrors.reportingOffice}</p>
+                <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {validationErrors.reportingOffice}
+                </p>
               )}
             </div>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Error Alert with Enhanced Styling */}
           {submitError && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-6 animate-fade-in">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -767,9 +1003,7 @@ export default function ReportPage() {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    Unable to Submit Report
-                  </h3>
+                  <h3 className="text-sm font-medium text-red-800">Unable to Submit Report</h3>
                   <div className="mt-2 text-sm text-red-700">
                     {submitError}
                     {submitError.includes('session') && (
@@ -786,52 +1020,46 @@ export default function ReportPage() {
             </div>
           )}
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-            {/* Section Header */}
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">I. EMPLOYMENT FACILITATION</h2>
-              <p className="text-sm text-gray-600 mt-1">A. PUBLIC EMPLOYMENT SERVICE OFFICE</p>
+          {/* Main Content Card with Enhanced Styling */}
+          <div className="bg-white rounded-xl shadow-md border border-gray-200">
+            {/* Section Header with Gradient */}
+            <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                I. EMPLOYMENT FACILITATION
+              </h2>
+              <p className="text-sm text-gray-600 mt-1 ml-7">A. PUBLIC EMPLOYMENT SERVICE OFFICE</p>
             </div>
 
-            {/* Quick Add Section */}
-            <div className="p-6 border-b border-gray-200 bg-gray-50">
+            {/* Quick Add Section with Enhanced Styling */}
+            <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
               <div className="flex flex-col space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-gray-900">Quick Add Programs</h3>
-                  <button
-                    type="button"
-                    onClick={() => addNewRow()}
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                  >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
-                    Add Custom Entry
-                  </button>
+                    Navigate to Indicators
+                  </h3>
                 </div>
+
+                {/* Program Navigation Links */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {programOptions.map((program) => (
                     <button
                       key={program.value}
                       type="button"
                       onClick={() => {
-                        const newRow = {
-                          program: program.value as ProgramType,
-                          indicator: "",
-                          sub_indicator: "",
-                          sub_sub_indicator: "",
-                          previous_report_period: 0,
-                          current_period: 0,
-                          remarks: ""
-                        };
-                        setFormData(prev => ({
-                          ...prev,
-                          employmentFacilitation: [...prev.employmentFacilitation, newRow]
-                        }));
+                        const element = document.getElementById(`program-${program.value}`);
+                        if (element) {
+                          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
                       }}
-                      className="flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                      className="flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
                     >
-                      <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 mr-2">
+                      <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 mr-2 font-semibold">
                         {program.label.split('.')[0]}
                       </span>
                       <span className="truncate">{program.label.split('.')[1]}</span>
@@ -841,171 +1069,304 @@ export default function ReportPage() {
               </div>
             </div>
 
-            {/* Table Section */}
+            {/* Table Section with Enhanced Styling */}
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="px-6 py-4 text-left border-b border-gray-200 font-semibold text-gray-900 w-[8%]">KRA</th>
-                    <th className="px-6 py-4 text-left border-b border-gray-200 font-semibold text-gray-900 w-[20%]">INDICATOR</th>
-                    <th className="px-6 py-4 text-left border-b border-gray-200 font-semibold text-gray-900 w-[35%]">
-                      <div>OTHER SPECIFICATION</div>
-                    </th>
-                    <th className="px-6 py-4 text-center border-b border-gray-200 font-semibold text-gray-900 w-[12%]">
-                      <div>PREVIOUS</div>
-                      <div className="text-xs font-normal text-gray-500">REPORTING PERIOD</div>
-                    </th>
-                    <th className="px-6 py-4 text-center border-b border-gray-200 font-semibold text-gray-900 w-[12%]">
-                      <div>CURRENT</div>
-                      <div className="text-xs font-normal text-gray-500">REPORTING PERIOD</div>
-                    </th>
-                    <th className="px-6 py-4 w-[3%] border-b border-gray-200"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {formData.employmentFacilitation.map((row, index) => (
-                    <tr key={index} className="group hover:bg-blue-50 transition-colors">
-                      <td className="px-6 py-4">I</td>
-                      <td className="px-6 py-4">
-                        <div className="space-y-3">
-                          <div className="relative">
-                            <select
-                              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors appearance-none"
-                              value={row.program}
-                              onChange={(e) => updateRow(index, "program", e.target.value as ProgramType)}
+                <tbody className="divide-y divide-gray-100">
+                  {programOptions.map((program) => {
+                    const indicators = indicatorOptions[program.value] || [];
+                    return (
+                      <React.Fragment key={program.value}>
+                        {/* Program Row */}
+                        <tr id={`program-${program.value}`} className="bg-gradient-to-r from-blue-50 to-blue-100/30 font-medium group">
+                          <td className="px-6 py-4 text-gray-900">
+                            <div className="flex items-center space-x-2">
+                              <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-100 text-blue-700 font-semibold text-sm">
+                                {program.label.split('.')[0]}
+                              </span>
+                              <span>{program.label.split('.')[1]}</span>
+                            </div>
+                          </td>
+                          <td colSpan={4}></td>
+                          <td className="px-6 py-4">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  employmentFacilitation: prev.employmentFacilitation.filter(
+                                    row => row.program !== program.value
+                                  )
+                                }));
+                              }}
+                              className="invisible group-hover:visible p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-50 transition-colors"
                             >
-                              <option value="">Select Program</option>
-                              {programOptions.map(option => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          {row.program && (
-                            <div className="relative">
-                              <select
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors appearance-none"
-                                value={row.indicator}
-                                onChange={(e) => updateRow(index, "indicator", e.target.value)}
-                              >
-                                <option value="">Select Indicator</option>
-                                {indicatorOptions[row.program]?.map(option => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="space-y-3">
-                          {row.indicator && (
-                            <div className="relative">
-                              <select
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors appearance-none"
-                                value={row.sub_indicator}
-                                onChange={(e) => updateRow(index, "sub_indicator", e.target.value)}
-                              >
-                                <option value="">Select Sub-Indicator</option>
-                                {subIndicatorOptions[row.indicator]?.map((option: IndicatorOption) => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                          {row.sub_indicator && subIndicatorOptions[row.sub_indicator] && (
-                            <div className="relative">
-                              <select
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors appearance-none"
-                                value={row.sub_sub_indicator}
-                                onChange={(e) => updateRow(index, "sub_sub_indicator", e.target.value)}
-                              >
-                                <option value="">Select Sub-Sub-Indicator</option>
-                                {subIndicatorOptions[row.sub_indicator]?.map((option: IndicatorOption) => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                          value={row.previous_report_period}
-                          onChange={(e) => updateRow(index, "previous_report_period", parseInt(e.target.value) || 0)}
-                        />
-                      </td>
-                      <td className="px-6 py-4">
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                          value={row.current_period}
-                          onChange={(e) => updateRow(index, "current_period", parseInt(e.target.value) || 0)}
-                        />
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          type="button"
-                          onClick={() => removeRow(index)}
-                          className="invisible group-hover:visible p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-red-50 transition-colors"
-                          title="Remove row"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+
+                        {/* Indicators */}
+                        {indicators.map((indicator) => {
+                          const subIndicators = subIndicatorOptions[indicator.value] || [];
+                          const indicatorRow = formData.employmentFacilitation.find(
+                            row => row.program === program.value && row.indicator === indicator.value && !row.sub_indicator
+                          );
+
+                          return (
+                            <React.Fragment key={indicator.value}>
+                              {/* Indicator Row */}
+                              <tr className="hover:bg-gray-50/50 transition-colors">
+                                <td className="px-6 py-3 pl-16 text-gray-900">
+                                  <div className="flex items-center space-x-2">
+                                    <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                                    <span>{indicator.label}</span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    value={indicatorRow?.previous_report_period || 0}
+                                    onChange={(e) => {
+                                      const newValue = parseInt(e.target.value) || 0;
+                                      updateIndicatorValue(program.value, indicator.value, "previous_report_period", newValue);
+                                    }}
+                                  />
+                                </td>
+                                <td className="px-3 py-2"></td>
+                                <td className="px-3 py-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                    value={indicatorRow?.current_period || 0}
+                                    onChange={(e) => {
+                                      const newValue = parseInt(e.target.value) || 0;
+                                      updateIndicatorValue(program.value, indicator.value, "current_period", newValue);
+                                    }}
+                                  />
+                                </td>
+                                <td className="px-3 py-2"></td>
+                                <td></td>
+                              </tr>
+
+                              {/* Sub-indicators */}
+                              {subIndicators.map((subInd) => {
+                                const subIndicatorRow = formData.employmentFacilitation.find(
+                                  row => row.program === program.value &&
+                                    row.indicator === indicator.value &&
+                                    row.sub_indicator === subInd.value &&
+                                    !row.sub_sub_indicator
+                                );
+                                const subSubIndicators = subIndicatorOptions[subInd.value] || [];
+
+                                // Check if this is a female entry
+                                const isFemaleEntry = subInd.value === "FEMALE" || subInd.label.includes("Female");
+
+                                // Check if this is an LRA entry that should not have female styling
+                                const isLRAEntry = subInd.label.includes("LRA") ||
+                                  subInd.label.includes("Local Government Units") ||
+                                  subInd.label.includes("Private Institutions") ||
+                                  subInd.label.includes("Schools");
+
+                                // Only apply female styling if it's a female entry and not an LRA entry
+                                const shouldApplyFemaleStyling = isFemaleEntry && !isLRAEntry;
+
+                                return (
+                                  <React.Fragment key={subInd.value}>
+                                    {/* Sub-indicator Row */}
+                                    <tr className="hover:bg-gray-50/50 transition-colors">
+                                      <td className="px-6 py-3 pl-24 text-gray-800">
+                                        <div className="flex items-center space-x-2">
+                                          <div className={`w-1 h-1 ${shouldApplyFemaleStyling ? 'bg-pink-300' : 'bg-gray-300'} rounded-full`}></div>
+                                          <span className="flex items-center space-x-1">
+                                            <span>{subInd.label}</span>
+                                            {shouldApplyFemaleStyling && (
+                                              <svg className="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                              </svg>
+                                            )}
+                                          </span>
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          className={`w-full px-3 py-2 rounded-lg border text-center focus:ring-2 transition-colors ${shouldApplyFemaleStyling
+                                            ? 'border-pink-200 focus:ring-pink-500 focus:border-pink-500 bg-pink-50/30'
+                                            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                            }`}
+                                          value={subIndicatorRow?.previous_report_period || 0}
+                                          onChange={(e) => {
+                                            const newValue = parseInt(e.target.value) || 0;
+                                            updateSubIndicatorValue(
+                                              program.value,
+                                              indicator.value,
+                                              subInd.value,
+                                              "previous_report_period",
+                                              newValue
+                                            );
+                                          }}
+                                        />
+                                      </td>
+                                      <td className="px-3 py-2"></td>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          className={`w-full px-3 py-2 rounded-lg border text-center focus:ring-2 transition-colors ${shouldApplyFemaleStyling
+                                            ? 'border-pink-200 focus:ring-pink-500 focus:border-pink-500 bg-pink-50/30'
+                                            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                            }`}
+                                          value={subIndicatorRow?.current_period || 0}
+                                          onChange={(e) => {
+                                            const newValue = parseInt(e.target.value) || 0;
+                                            updateSubIndicatorValue(
+                                              program.value,
+                                              indicator.value,
+                                              subInd.value,
+                                              "current_period",
+                                              newValue
+                                            );
+                                          }}
+                                        />
+                                      </td>
+                                      <td className="px-3 py-2"></td>
+                                      <td></td>
+                                    </tr>
+
+                                    {/* Sub-sub-indicators (Female) */}
+                                    {subSubIndicators.map((subSubInd) => {
+                                      const subSubIndicatorRow = formData.employmentFacilitation.find(
+                                        row => row.program === program.value &&
+                                          row.indicator === indicator.value &&
+                                          row.sub_indicator === subInd.value &&
+                                          row.sub_sub_indicator === subSubInd.value
+                                      );
+
+                                      return (
+                                        <tr key={subSubInd.value} className="hover:bg-gray-50/50 transition-colors">
+                                          <td className="px-6 py-3 pl-32 text-gray-700">
+                                            <div className="flex items-center space-x-2">
+                                              <div className="w-1 h-1 bg-pink-300 rounded-full"></div>
+                                              <span className="flex items-center space-x-1">
+                                                <span>{subSubInd.label}</span>
+                                                <svg className="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                              </span>
+                                            </div>
+                                          </td>
+                                          <td className="px-3 py-2">
+                                            <input
+                                              type="number"
+                                              min="0"
+                                              max={subIndicatorRow?.previous_report_period || 0}
+                                              className="w-full px-3 py-2 rounded-lg border border-pink-200 text-center focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors bg-pink-50/30"
+                                              value={subSubIndicatorRow?.previous_female_count || 0}
+                                              onChange={(e) => {
+                                                const newValue = parseInt(e.target.value) || 0;
+                                                if (newValue <= (subIndicatorRow?.previous_report_period || 0)) {
+                                                  updateSubSubIndicatorValue(
+                                                    program.value,
+                                                    indicator.value,
+                                                    subInd.value,
+                                                    subSubInd.value,
+                                                    "previous_female_count",
+                                                    newValue
+                                                  );
+                                                }
+                                              }}
+                                            />
+                                          </td>
+                                          <td className="px-3 py-2"></td>
+                                          <td className="px-3 py-2">
+                                            <input
+                                              type="number"
+                                              min="0"
+                                              max={subIndicatorRow?.current_period || 0}
+                                              className="w-full px-3 py-2 rounded-lg border border-pink-200 text-center focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors bg-pink-50/30"
+                                              value={subSubIndicatorRow?.current_female_count || 0}
+                                              onChange={(e) => {
+                                                const newValue = parseInt(e.target.value) || 0;
+                                                if (newValue <= (subIndicatorRow?.current_period || 0)) {
+                                                  updateSubSubIndicatorValue(
+                                                    program.value,
+                                                    indicator.value,
+                                                    subInd.value,
+                                                    subSubInd.value,
+                                                    "current_female_count",
+                                                    newValue
+                                                  );
+                                                }
+                                              }}
+                                            />
+                                          </td>
+                                          <td className="px-3 py-2"></td>
+                                          <td></td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </React.Fragment>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Form Actions */}
-          <div className="flex justify-end gap-4">
+          {/* Form Actions with Enhanced Styling */}
+          <div className="flex justify-end gap-4 sticky bottom-0 bg-white p-4 border-t border-gray-200 rounded-lg shadow-lg z-10">
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-6 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               disabled={isSubmitting}
             >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               disabled={isSubmitting}
             >
               {isSubmitting ? (
-                <div className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                   Submitting...
-                </div>
+                </>
               ) : (
-                'Submit Report'
+                <>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Submit Report
+                </>
               )}
             </button>
           </div>
         </form>
 
-        {/* Validation Errors Popup */}
+        {/* Validation Errors Popup with Enhanced Styling */}
         {showValidationErrors && Object.keys(validationErrors).length > 0 && (
-          <div className="fixed bottom-4 right-4 bg-white rounded-xl shadow-lg border border-gray-200 p-4 max-w-md z-50 animate-fade-in">
+          <div className="fixed bottom-4 right-4 bg-white rounded-xl shadow-lg border border-amber-200 p-4 max-w-md z-50 animate-fade-in">
             <div className="flex items-start justify-between">
               <div className="flex items-start space-x-3">
                 <div className="flex-shrink-0 mt-0.5">
@@ -1037,45 +1398,9 @@ export default function ReportPage() {
           </div>
         )}
 
-        {/* Submit Error Alert */}
-        {submitError && (
-          <div className="fixed bottom-4 right-4 bg-white rounded-xl shadow-lg border border-red-100 p-4 max-w-md z-50 animate-fade-in">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0 mt-0.5">
-                  <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-gray-900 font-medium">Oops! Something went wrong</h4>
-                  <p className="mt-1 text-sm text-gray-600">{submitError}</p>
-                  {submitError.includes('session') && (
-                    <button
-                      onClick={() => router.push('/login')}
-                      className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-500"
-                    >
-                      Log in again →
-                    </button>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={() => setSubmitError(null)}
-                className="flex-shrink-0 ml-4 p-1 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded-full"
-              >
-                <span className="sr-only">Close</span>
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Success Message */}
+        {/* Success Message with Enhanced Styling */}
         {submitSuccess && (
-          <div className="fixed bottom-4 right-4 bg-white rounded-xl shadow-lg border border-green-100 p-4 max-w-md z-50 animate-fade-in">
+          <div className="fixed bottom-4 right-4 bg-white rounded-xl shadow-lg border border-green-200 p-4 max-w-md z-50 animate-fade-in">
             <div className="flex items-start space-x-3">
               <div className="flex-shrink-0">
                 <svg className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1091,13 +1416,13 @@ export default function ReportPage() {
                       setSubmitSuccess(false);
                       resetForm();
                     }}
-                    className="text-sm font-medium text-gray-600 hover:text-gray-500"
+                    className="text-sm font-medium text-gray-600 hover:text-gray-500 transition-colors"
                   >
                     Create Another Report
                   </button>
                   <button
                     onClick={() => router.push('/report-entry')}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-500"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"
                   >
                     View Report Entries →
                   </button>
@@ -1116,7 +1441,7 @@ export default function ReportPage() {
           </div>
         )}
 
-        {/* Add this style to your CSS or in a style tag */}
+        {/* Animations */}
         <style jsx>{`
           @keyframes fade-in {
             from { opacity: 0; transform: translateY(10px); }

@@ -15,11 +15,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isBLE, setIsBLE] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setShowSuccess(false);
 
     try {
       const { data, error: loginError } = await supabase
@@ -57,12 +59,17 @@ export default function LoginPage() {
       };
 
       login(userData);
+      setShowSuccess(true);
 
-      if (data.role === "admin") {
-        router.push("/admin");
-      } else {
-        router.push("/dashboard");
-      }
+      // Delay redirect to show success message
+      setTimeout(() => {
+        if (data.role === "admin") {
+          router.push("/admin");
+        } else {
+          router.push("/dashboard");
+        }
+      }, 1500);
+
     } catch (err) {
       setError("An error occurred during login. Please try again.");
       console.error("Login error:", err);
@@ -112,7 +119,7 @@ export default function LoginPage() {
         </div>
 
         {/* Logo and Brand Section */}
-        <div className="relative bg-white/50 backdrop-blur-sm rounded-2xl p-6 mb-6 border border-gray-200/50 shadow-sm">
+        <div className="relative bg-white/50 backdrop-blur-sm rounded-2xl p-6 mb-6 border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300">
           <div className="flex items-center gap-6">
             {/* Logo */}
             <div className={`flex-shrink-0 w-16 h-16 ${isBLE ? 'bg-purple-600' : 'bg-blue-600'
@@ -144,13 +151,33 @@ export default function LoginPage() {
             Sign in to access your {isBLE ? 'admin dashboard' : 'PESO dashboard'}
           </p>
 
+          {/* Success Alert */}
+          {showSuccess && (
+            <div className="mb-6 p-4 rounded-lg bg-green-50 border border-green-200 flex items-center animate-fade-in">
+              <div className="flex-shrink-0">
+                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-green-800">Login successful!</p>
+                <p className="text-sm text-green-600">Redirecting to your dashboard...</p>
+              </div>
+            </div>
+          )}
+
           {/* Error Alert */}
           {error && (
             <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 flex items-center animate-shake">
-              <svg className="w-5 h-5 text-red-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-red-600">{error}</p>
+              <div className="flex-shrink-0">
+                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-red-800">Login failed</p>
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
             </div>
           )}
 
@@ -263,6 +290,15 @@ export default function LoginPage() {
 
         .animate-shake {
           animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade-in {
+          animation: fadeIn 0.3s ease-out forwards;
         }
       `}</style>
     </div>

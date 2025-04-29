@@ -17,9 +17,8 @@ export interface Report {
   id: string;
   reporting_period: string;
   reporting_office: string;
+  profile_id: number;
   created_at: string;
-  updated_at: string;
-  status: ReportStatus;
 }
 
 export interface Profile {
@@ -34,17 +33,16 @@ export interface Profile {
 export interface EmploymentFacilitation {
   id: string;
   report_id: string;
-  program: ProgramType;
+  program: string;
   indicator: string;
-  sub_indicator?: string;
-  sub_sub_indicator?: string;
+  sub_indicator?: string | null;
+  sub_sub_indicator?: string | null;
   previous_report_period: number;
   current_period: number;
-  remarks?: string;
-  created_at: string;
-  updated_at: string;
+  remarks?: string | null;
 }
 
 export interface CompleteReport extends Report {
   entries: EmploymentFacilitation[];
+  profile: Profile;
 } 

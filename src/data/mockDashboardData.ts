@@ -7,6 +7,7 @@ type YearlyData = {
         educationData: typeof baseEducationData;
         sectorData: typeof baseSectorData;
         quickStats: typeof baseQuickStats;
+        monthlyGenderData: { male: number; female: number }[];
     };
 };
 
@@ -16,11 +17,11 @@ const baseMonthlyData = {
     datasets: [
         {
             label: 'Solicited Vacancies',
-            borderColor: '#2563eb',
-            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.7)',
             tension: 0.4,
             pointRadius: 4,
-            pointBackgroundColor: '#2563eb',
+            pointBackgroundColor: '#3b82f6',
             pointBorderColor: '#ffffff',
             pointBorderWidth: 2,
             fill: true,
@@ -28,11 +29,11 @@ const baseMonthlyData = {
         },
         {
             label: 'Registered Applicants',
-            borderColor: '#059669',
-            backgroundColor: 'rgba(5, 150, 105, 0.1)',
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.7)',
             tension: 0.4,
             pointRadius: 4,
-            pointBackgroundColor: '#059669',
+            pointBackgroundColor: '#10b981',
             pointBorderColor: '#ffffff',
             pointBorderWidth: 2,
             fill: true,
@@ -40,11 +41,11 @@ const baseMonthlyData = {
         },
         {
             label: 'Referred Applicants',
-            borderColor: '#d97706',
-            backgroundColor: 'rgba(217, 119, 6, 0.1)',
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.7)',
             tension: 0.4,
             pointRadius: 4,
-            pointBackgroundColor: '#d97706',
+            pointBackgroundColor: '#f59e0b',
             pointBorderColor: '#ffffff',
             pointBorderWidth: 2,
             fill: true,
@@ -52,11 +53,11 @@ const baseMonthlyData = {
         },
         {
             label: 'Placed Applicants',
-            borderColor: '#dc2626',
-            backgroundColor: 'rgba(220, 38, 38, 0.1)',
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.7)',
             tension: 0.4,
             pointRadius: 4,
-            pointBackgroundColor: '#dc2626',
+            pointBackgroundColor: '#ef4444',
             pointBorderColor: '#ffffff',
             pointBorderWidth: 2,
             fill: true,
@@ -92,8 +93,8 @@ const baseTopJobsData = {
 const baseGenderData = {
     labels: ['Male', 'Female'],
     datasets: [{
-        backgroundColor: ['#2563eb', '#db2777'],
-        borderColor: ['#1e40af', '#be185d'],
+        backgroundColor: ['rgba(71, 85, 105, 0.8)', 'rgba(156, 39, 176, 0.8)'],
+        borderColor: ['rgb(51, 65, 85)', 'rgb(123, 31, 139)'],
         borderWidth: 1,
         data: [] as number[]
     }]
@@ -103,8 +104,18 @@ const baseGenderData = {
 const baseEducationData = {
     labels: ['College Degree', 'Vocational', 'High School', 'Post-Graduate'],
     datasets: [{
-        backgroundColor: ['#2563eb', '#059669', '#d97706', '#7c3aed'],
-        borderColor: ['#1e40af', '#047857', '#b45309', '#5b21b6'],
+        backgroundColor: [
+            'rgba(71, 85, 105, 0.8)',   // Slate
+            'rgba(20, 184, 166, 0.8)',   // Teal
+            'rgba(234, 88, 12, 0.8)',    // Orange
+            'rgba(109, 40, 217, 0.8)'    // Purple
+        ],
+        borderColor: [
+            'rgb(51, 65, 85)',         // Darker Slate
+            'rgb(17, 94, 89)',         // Darker Teal
+            'rgb(194, 65, 12)',        // Darker Orange
+            'rgb(88, 28, 135)'         // Darker Purple
+        ],
         borderWidth: 1,
         data: [] as number[]
     }]
@@ -114,8 +125,16 @@ const baseEducationData = {
 const baseSectorData = {
     labels: ['Private Sector', 'Government', 'NGO/Non-Profit'],
     datasets: [{
-        backgroundColor: ['#2563eb', '#059669', '#7c3aed'],
-        borderColor: ['#1e40af', '#047857', '#5b21b6'],
+        backgroundColor: [
+            'rgba(71, 85, 105, 0.8)',   // Slate
+            'rgba(20, 184, 166, 0.8)',   // Teal
+            'rgba(109, 40, 217, 0.8)'    // Purple
+        ],
+        borderColor: [
+            'rgb(51, 65, 85)',         // Darker Slate
+            'rgb(17, 94, 89)',         // Darker Teal
+            'rgb(88, 28, 135)'         // Darker Purple
+        ],
         borderWidth: 1,
         data: [] as number[]
     }]
@@ -162,6 +181,20 @@ const mockData: YearlyData = {
                 data: [58, 42] // More balanced gender distribution
             }]
         },
+        monthlyGenderData: [
+            { male: 55, female: 45 }, // January
+            { male: 56, female: 44 }, // February
+            { male: 57, female: 43 }, // March
+            { male: 58, female: 42 }, // April
+            { male: 59, female: 41 }, // May
+            { male: 60, female: 40 }, // June
+            { male: 59, female: 41 }, // July
+            { male: 58, female: 42 }, // August
+            { male: 57, female: 43 }, // September
+            { male: 56, female: 44 }, // October
+            { male: 55, female: 45 }, // November
+            { male: 54, female: 46 }  // December
+        ],
         educationData: {
             ...baseEducationData,
             datasets: [{
@@ -214,6 +247,20 @@ const mockData: YearlyData = {
                 data: [62, 38] // More gender gap
             }]
         },
+        monthlyGenderData: [
+            { male: 60, female: 40 }, // January
+            { male: 61, female: 39 }, // February
+            { male: 62, female: 38 }, // March
+            { male: 63, female: 37 }, // April
+            { male: 64, female: 36 }, // May
+            { male: 65, female: 35 }, // June
+            { male: 64, female: 36 }, // July
+            { male: 63, female: 37 }, // August
+            { male: 62, female: 38 }, // September
+            { male: 61, female: 39 }, // October
+            { male: 60, female: 40 }, // November
+            { male: 59, female: 41 }  // December
+        ],
         educationData: {
             ...baseEducationData,
             datasets: [{
@@ -266,6 +313,20 @@ const mockData: YearlyData = {
                 data: [65, 35] // Significant gender gap
             }]
         },
+        monthlyGenderData: [
+            { male: 63, female: 37 }, // January
+            { male: 64, female: 36 }, // February
+            { male: 65, female: 35 }, // March
+            { male: 66, female: 34 }, // April
+            { male: 67, female: 33 }, // May
+            { male: 68, female: 32 }, // June
+            { male: 67, female: 33 }, // July
+            { male: 66, female: 34 }, // August
+            { male: 65, female: 35 }, // September
+            { male: 64, female: 36 }, // October
+            { male: 63, female: 37 }, // November
+            { male: 62, female: 38 }  // December
+        ],
         educationData: {
             ...baseEducationData,
             datasets: [{
@@ -289,7 +350,26 @@ const mockData: YearlyData = {
     }
 };
 
-// Function to get data for a specific year
-export const getDashboardData = (year: string) => {
-    return mockData[year] || mockData['2024']; // Default to 2024 if year not found
-}; 
+// Function to get dashboard data for a specific period
+export function getDashboardData(period: string) {
+    const year = period.length === 4 ? period : '2024'; // Default to 2024 if not a year
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Generate monthly gender distribution data
+    const monthlyGenderData = months.map(() => {
+        const malePercentage = Math.floor(Math.random() * 20) + 45; // Random between 45-65
+        return {
+            male: malePercentage,
+            female: 100 - malePercentage
+        };
+    });
+
+    // Get the base data for the year
+    const yearData = mockData[year] || mockData['2024']; // Default to 2024 if year not found
+
+    // Return combined data
+    return {
+        ...yearData,
+        monthlyGenderData
+    };
+} 
