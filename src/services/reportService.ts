@@ -41,6 +41,8 @@ export const reportService = {
           sub_sub_indicator: entry.sub_sub_indicator,
           previous_report_period: entry.previous_report_period,
           current_period: entry.current_period,
+          previous_female_count: entry.previous_female_count,
+          current_female_count: entry.current_female_count,
           remarks: entry.remarks,
         })),
         profile_id: user.id
@@ -142,13 +144,13 @@ export const reportService = {
       const storedUser = localStorage.getItem("user");
       if (!storedUser) {
         console.error('No authenticated user found');
-        return [];
+        throw new Error('No authenticated user found');
       }
 
       const user = JSON.parse(storedUser);
       if (!user?.id) {
         console.error('Invalid user data');
-        return [];
+        throw new Error('Invalid user data');
       }
 
       const { data: reports, error: reportsError } = await supabase
@@ -170,21 +172,30 @@ export const reportService = {
 
       if (reportsError) {
         console.error('Error fetching reports:', reportsError);
-        return [];
+        throw reportsError;
       }
 
       if (!reports || reports.length === 0) {
         return [];
       }
 
-      return reports.map(report => ({
-        ...report,
-        entries: report.employment_facilitation_entries || [],
-        profile: report.profile
-      }));
+      // Validate and transform the data
+      return reports.map(report => {
+        // Ensure all required fields are present
+        if (!report.id || !report.reporting_period || !report.reporting_office) {
+          console.warn('Invalid report data:', report);
+          return null;
+        }
+
+        return {
+          ...report,
+          entries: report.employment_facilitation_entries || [],
+          profile: report.profile
+        };
+      }).filter((report): report is CompleteReport => report !== null);
     } catch (error) {
       console.error('Unexpected error in getUserReports:', error);
-      return [];
+      throw error;
     }
   },
 
@@ -214,5 +225,37 @@ export const reportService = {
     } catch (error) {
       return handleSupabaseError<boolean>(error, false);
     }
+  },
+
+  async getPreviousReport(reportingPeriod: string, reportingOffice: string, profileId: number) {
+    // Query for the most recent report before the given period for the office and user
+    // (Assume reportingPeriod is in YYYY-MM format)
+    const { data, error } = await supabase
+      .from("employment_reports")
+      .select(`
+        *,
+        employment_facilitation_entries(
+          program,
+          indicator,
+          sub_indicator,
+          sub_sub_indicator,
+          previous_report_period,
+          current_period,
+          previous_female_count,
+          current_female_count,
+          remarks
+        )
+      `)
+      .eq("reporting_office", reportingOffice)
+      .eq("profile_id", profileId)
+      .lt("reporting_period", reportingPeriod)
+      .order("reporting_period", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.error('Error fetching previous report:', error);
+      return null;
+    }
+    return data;
   },
 };

@@ -218,168 +218,94 @@ export default function AdminPage() {
       {/* Admin Header with Stats */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Manage and View all PESO Reports</h1>
-        
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-            <div className="text-sm font-medium text-gray-500">Total Reports</div>
-            <div className="mt-1 text-2xl font-semibold text-gray-900">{reportData?.length || 0}</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-            <div className="text-sm font-medium text-gray-500">Pending Review</div>
-            <div className="mt-1 text-2xl font-semibold text-yellow-600">
-              {reportData?.filter(r => r.status === 'submitted').length || 0}
+        <p className="text-gray-600 mt-1 text-base">All submitted employment reports are listed below. You can export each report or summary as PDF.</p>
+        <div className="mt-6">
+          <div className="bg-gradient-to-r from-blue-400 to-blue-600 p-6 rounded-2xl shadow-lg flex items-center gap-4 w-full max-w-xs">
+            <div className="flex items-center justify-center w-14 h-14 rounded-full bg-blue-100">
+              <svg className="w-7 h-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-6 4h6a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
             </div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-            <div className="text-sm font-medium text-gray-500">Approved</div>
-            <div className="mt-1 text-2xl font-semibold text-green-600">
-              {reportData?.filter(r => r.status === 'approved').length || 0}
-            </div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-            <div className="text-sm font-medium text-gray-500">Rejected</div>
-            <div className="mt-1 text-2xl font-semibold text-red-600">
-              {reportData?.filter(r => r.status === 'rejected').length || 0}
+            <div>
+              <div className="text-3xl font-extrabold text-white drop-shadow">{reportData?.length || 0}</div>
+              <div className="mt-1 inline-block px-3 py-1 bg-white/80 text-blue-700 rounded-full text-xs font-semibold shadow">Total Reports</div>
             </div>
           </div>
         </div>
+        <hr className="my-8 border-blue-100" />
       </div>
 
       {/* Enhanced Filters */}
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div>
-          <label htmlFor="office-filter" className="block text-sm font-medium text-gray-700 mb-1">
-            Filter by Office
-          </label>
-          <select
-            id="office-filter"
-            value={filterOffice}
-            onChange={(e) => setFilterOffice(e.target.value)}
-            className="block w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="">All Offices</option>
-            {getUniqueOffices().map((office) => (
-              <option key={office} value={office}>
-                {office}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="period-filter" className="block text-sm font-medium text-gray-700 mb-1">
-            Filter by Period
-          </label>
-          <select
-            id="period-filter"
-            value={filterPeriod}
-            onChange={(e) => setFilterPeriod(e.target.value)}
-            className="block w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="">All Periods</option>
-            {getUniquePeriods().map((period) => (
-              <option key={period} value={period}>
-                {period}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
-            Filter by Status
-          </label>
-          <select
-            id="status-filter"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="block w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="submitted">Submitted</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
+      <div className="mb-8">
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 flex flex-wrap gap-6 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label htmlFor="office-filter" className="block text-sm font-medium text-gray-700 mb-1">Filter by Office</label>
+            <select
+              id="office-filter"
+              value={filterOffice}
+              onChange={(e) => setFilterOffice(e.target.value)}
+              className="block w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-blue-500 focus:ring-blue-500 shadow-sm"
+            >
+              <option value="">All Offices</option>
+              {getUniqueOffices().map((office) => (
+                <option key={office} value={office}>{office}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label htmlFor="period-filter" className="block text-sm font-medium text-gray-700 mb-1">Filter by Period</label>
+            <select
+              id="period-filter"
+              value={filterPeriod}
+              onChange={(e) => setFilterPeriod(e.target.value)}
+              className="block w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-blue-500 focus:ring-blue-500 shadow-sm"
+            >
+              <option value="">All Periods</option>
+              {getUniquePeriods().map((period) => (
+                <option key={period} value={period}>{period}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Enhanced Reports List */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 mb-8">
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 mb-12">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-blue-50 sticky top-0 z-10">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Reporting Office
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Reporting Period
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  PESO Staff
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Municipal Mayor
-                </th>
-                <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-blue-700 uppercase tracking-wider">Reporting Office</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-blue-700 uppercase tracking-wider">Reporting Period</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-blue-700 uppercase tracking-wider">PESO Staff</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-blue-700 uppercase tracking-wider">Municipal Mayor</th>
+                <th className="px-6 py-3 text-center text-xs font-bold text-blue-700 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-100">
               {filteredReports?.map((report, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(report.status || 'pending')}`}>
-                      {(report.status || 'pending').charAt(0).toUpperCase() + (report.status || 'pending').slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {report.reporting_office}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.reporting_period}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.user_profile?.name || 'N/A'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.user_profile?.municipal_mayor || 'N/A'}
-                  </td>
+                <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-blue-50/40'}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{report.reporting_office}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{report.reporting_period}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{report.user_profile?.name || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{report.user_profile?.municipal_mayor || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                    <div className="flex justify-center space-x-2">
-                      {(report.status === 'submitted' || !report.status) && (
-                        <>
-                          <button
-                            onClick={() => handleStatusChange(report.id, 'approved')}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleStatusChange(report.id, 'rejected')}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                          >
-                            Reject
-                          </button>
-                        </>
-                      )}
+                    <div className="flex justify-center space-x-2 items-center">
                       <button
                         onClick={() => handleExportPDF(document.getElementById(`report-${index}`)!, index)}
                         disabled={exportingReport}
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
                       >
                         {exportingReport ? 'Exporting...' : 'Export SPRS'}
                       </button>
                       <button
                         onClick={() => handleExportSummary(document.getElementById(`summary-${index}`)!, index)}
                         disabled={exportingSummary}
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition"
                       >
                         {exportingSummary ? 'Exporting...' : 'Export Summary'}
                       </button>
+                      <span className="ml-2 inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold shadow-sm">{report.entries?.length || 0} entries</span>
                     </div>
                   </td>
                 </tr>
@@ -388,6 +314,7 @@ export default function AdminPage() {
           </table>
         </div>
       </div>
+      <hr className="my-12 border-gray-200" />
 
       {/* Hidden Report Elements for Export */}
       {reportData.map((report, index) => (
@@ -597,9 +524,6 @@ export default function AdminPage() {
                     month: 'long',
                     day: 'numeric'
                   })}
-                </div>
-                <div className="italic text-gray-500">
-                  Note: Include in the SPRS a simple LMI Analysis Report...
                 </div>
               </div>
             </div>

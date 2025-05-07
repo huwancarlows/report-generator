@@ -13,6 +13,25 @@ export const createHighQualityCanvas = async (element: HTMLElement, options: Exp
     // Wait for any animations or transitions to complete
     await new Promise(resolve => setTimeout(resolve, options.delay || 500));
 
+    // --- PATCH: Replace all canvas with img (toDataURL) to fix blank chart export ---
+    const canvases = element.querySelectorAll('canvas');
+    const replaced: { canvas: HTMLCanvasElement, img: HTMLImageElement }[] = [];
+    canvases.forEach(canvas => {
+        try {
+            const dataUrl = canvas.toDataURL('image/png');
+            const img = document.createElement('img');
+            img.src = dataUrl;
+            img.width = canvas.width;
+            img.height = canvas.height;
+            img.style.display = canvas.style.display;
+            img.style.position = canvas.style.position;
+            canvas.parentNode?.replaceChild(img, canvas);
+            replaced.push({ canvas, img });
+        } catch (e) {
+            // fallback: do nothing
+        }
+    });
+
     // Calculate device pixel ratio and scale
     const dpr = window.devicePixelRatio || 1;
     const scale = options.scale || Math.max(dpr, 2); // Use at least 2x scaling for better quality
@@ -20,7 +39,7 @@ export const createHighQualityCanvas = async (element: HTMLElement, options: Exp
     // Default configuration for best quality
     const defaultOptions = {
         scale: scale,
-        useCORS: true,
+        useCORS: false, // Set to false for local canvas
         allowTaint: true,
         logging: false,
         imageTimeout: 0,
@@ -56,16 +75,6 @@ export const createHighQualityCanvas = async (element: HTMLElement, options: Exp
       `;
             clonedDoc.head.appendChild(style);
 
-            // Force charts to render at maximum quality
-            const canvases = clonedDoc.getElementsByTagName('canvas');
-            Array.from(canvases).forEach(canvas => {
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                    ctx.imageSmoothingEnabled = true;
-                    ctx.imageSmoothingQuality = 'high';
-                }
-            });
-
             // Wait for images to load in cloned document
             if (options.waitForImages) {
                 const images = clonedDoc.getElementsByTagName('img');
@@ -86,6 +95,11 @@ export const createHighQualityCanvas = async (element: HTMLElement, options: Exp
     try {
         // Create initial canvas
         const canvas = await html2canvas(element, { ...defaultOptions, ...options });
+
+        // Restore original canvases
+        replaced.forEach(({ canvas, img }) => {
+            img.parentNode?.replaceChild(canvas, img);
+        });
 
         // Create a new canvas with the exact same dimensions for better quality
         const perfectCanvas = document.createElement('canvas');

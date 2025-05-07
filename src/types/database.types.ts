@@ -33,13 +33,27 @@ export interface Profile {
 export interface EmploymentFacilitation {
   id: string;
   report_id: string;
-  program: string;
+  program: ProgramType;
   indicator: string;
   sub_indicator?: string | null;
   sub_sub_indicator?: string | null;
   previous_report_period: number;
   current_period: number;
+  previous_female_count?: number | null;
+  current_female_count?: number | null;
   remarks?: string | null;
+}
+
+export interface EmploymentFacilitationRow {
+  program: ProgramType;
+  indicator: string;
+  sub_indicator: string;
+  sub_sub_indicator: string;
+  previous_report_period: number;
+  current_period: number;
+  previous_female_count?: number;
+  current_female_count?: number;
+  remarks: string;
 }
 
 export interface CompleteReport extends Report {

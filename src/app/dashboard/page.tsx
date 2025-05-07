@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, createRef } from "react";
 import { useRouter } from "next/navigation";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement } from 'chart.js';
 import { Bar, Pie, Line, Chart } from 'react-chartjs-2';
@@ -51,90 +51,95 @@ interface CommonChartOptions {
   };
 }
 
-const GenderDistributionChart = ({ monthlyGenderData, selectedMonth }: { monthlyGenderData: Array<{ male: number, female: number }>, selectedMonth: string }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+const GenderDistributionChart = ({ genderData, totalApplicants, femaleNumber, maleNumber, forceRedraw, canvasRef }: {
+  genderData: { male: number, female: number },
+  totalApplicants: number,
+  femaleNumber: number,
+  maleNumber: number,
+  forceRedraw?: any,
+  canvasRef?: React.RefObject<HTMLCanvasElement | null>
+}) => {
+  const localCanvasRef = useRef<HTMLCanvasElement>(null);
+  const actualCanvasRef = canvasRef || localCanvasRef;
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  // Responsive draw
   const drawChart = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
+    const canvas = actualCanvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+    // Get actual pixel size
+    const dpr = window.devicePixelRatio || 1;
+    const width = container.offsetWidth * dpr;
+    const height = container.offsetHeight * dpr;
+    canvas.width = width;
+    canvas.height = height;
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    // Set canvas size based on container
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Get current month's data
-    const monthIndex = selectedMonth === 'all' ? 0 : parseInt(selectedMonth);
-    const currentData = monthlyGenderData[monthIndex];
-    const malePercentage = currentData.male;
-    const femalePercentage = currentData.female;
-
+    // Fill white background for export
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+    // Use genderData directly
+    const malePercentage = genderData.male;
+    const femalePercentage = genderData.female;
     // Calculate total figures based on percentages (1 figure = 10%)
     const totalFigures = 10;
-    const femaleFigures = Math.round((femalePercentage / 100) * totalFigures);
-    const maleFigures = totalFigures - femaleFigures;
-
-    // Enhanced colors with gradients
-    const femaleGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    const padding = Math.max(12, Math.round(height * 0.04));
+    // Icon sizing based on available width/height
+    const maxIconWidth = Math.min(32, (width - 2 * padding) / (totalFigures * 1.3));
+    const iconWidth = Math.max(18, maxIconWidth);
+    const iconHeight = iconWidth * 1.7;
+    const spacing = iconWidth * 0.28;
+    const totalIconsWidth = totalFigures * iconWidth + (totalFigures - 1) * spacing;
+    const startX = (width - totalIconsWidth) / 2;
+    const startY = Math.max(padding, height / 2 - iconHeight / 2 - iconHeight * 0.18);
+    // Draw female figures first with shadow
+    const femaleGradient = ctx.createLinearGradient(0, 0, 0, height);
     femaleGradient.addColorStop(0, '#EC4899');
     femaleGradient.addColorStop(1, '#DB2777');
-
-    const maleGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    maleGradient.addColorStop(0, '#3B82F6');
-    maleGradient.addColorStop(1, '#2563EB');
-
-    // Set up dimensions with improved spacing
-    const iconWidth = Math.min(40, canvas.width / (totalFigures * 1.5));
-    const iconHeight = iconWidth * 2; // Taller figures for better visibility
-    const spacing = iconWidth * 0.4; // Increased spacing between figures
-    const startX = (canvas.width - (totalFigures * (iconWidth + spacing) - spacing)) / 2;
-    const startY = canvas.height / 2 - iconHeight / 2 - 20; // Moved up to accommodate labels
-
-    // Draw female figures first with shadow
     ctx.fillStyle = femaleGradient;
-    ctx.shadowColor = 'rgba(236, 72, 153, 0.3)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 3;
-
+    ctx.shadowColor = 'rgba(236, 72, 153, 0.18)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 2;
+    const femaleFigures = Math.round((femalePercentage / 100) * totalFigures);
+    const maleFigures = totalFigures - femaleFigures;
     for (let i = 0; i < femaleFigures; i++) {
       const x = startX + i * (iconWidth + spacing);
-
-      // Head with smoother circle
+      // Head
       ctx.beginPath();
-      ctx.arc(x + iconWidth / 2, startY + iconWidth / 3, iconWidth / 3.5, 0, Math.PI * 2);
+      ctx.arc(x + iconWidth / 2, startY + iconWidth / 3, iconWidth / 3.7, 0, Math.PI * 2);
       ctx.fill();
-
-      // Triangle dress body with curved bottom
+      // Dress body
       ctx.beginPath();
       ctx.moveTo(x + iconWidth / 2, startY + iconWidth / 2);
       ctx.lineTo(x + iconWidth / 8, startY + iconHeight);
-      ctx.quadraticCurveTo(x + iconWidth / 2, startY + iconHeight + 5, x + iconWidth - iconWidth / 8, startY + iconHeight);
+      ctx.quadraticCurveTo(x + iconWidth / 2, startY + iconHeight + 3, x + iconWidth - iconWidth / 8, startY + iconHeight);
       ctx.closePath();
       ctx.fill();
     }
-
     // Reset shadow for male figures
-    ctx.shadowColor = 'rgba(59, 130, 246, 0.3)';
+    ctx.shadowColor = 'rgba(59, 130, 246, 0.18)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 2;
+    const maleGradient = ctx.createLinearGradient(0, 0, 0, height);
+    maleGradient.addColorStop(0, '#3B82F6');
+    maleGradient.addColorStop(1, '#2563EB');
     ctx.fillStyle = maleGradient;
-
     for (let i = 0; i < maleFigures; i++) {
       const x = startX + (i + femaleFigures) * (iconWidth + spacing);
-
       // Head
       ctx.beginPath();
-      ctx.arc(x + iconWidth / 2, startY + iconWidth / 3, iconWidth / 3.5, 0, Math.PI * 2);
+      ctx.arc(x + iconWidth / 2, startY + iconWidth / 3, iconWidth / 3.7, 0, Math.PI * 2);
       ctx.fill();
-
       // Rectangle body with rounded corners
-      const bodyWidth = iconWidth / 2;
-      const bodyHeight = iconHeight - iconWidth / 2;
-      const radius = bodyWidth / 4;
-
+      const bodyWidth = iconWidth / 2.2;
+      const bodyHeight = iconHeight - iconWidth / 2.2;
+      const radius = bodyWidth / 4.2;
       ctx.beginPath();
       ctx.moveTo(x + iconWidth / 2 - bodyWidth / 2 + radius, startY + iconWidth / 2);
       ctx.lineTo(x + iconWidth / 2 + bodyWidth / 2 - radius, startY + iconWidth / 2);
@@ -147,83 +152,75 @@ const GenderDistributionChart = ({ monthlyGenderData, selectedMonth }: { monthly
       ctx.quadraticCurveTo(x + iconWidth / 2 - bodyWidth / 2, startY + iconWidth / 2, x + iconWidth / 2 - bodyWidth / 2 + radius, startY + iconWidth / 2);
       ctx.fill();
     }
-
     // Reset shadow for text
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
-
-    // Add labels with enhanced styling
     ctx.textAlign = 'center';
-
-    // Female label with enhanced styling
-    const drawLabel = (count: number, label: string, percentage: number, x: number, color: string) => {
-      // Background pill
-      const labelWidth = 120;
-      const labelHeight = 80;
-      const labelY = startY + iconHeight + 30;
-
-      ctx.fillStyle = '#F8FAFC'; // Slight gray background
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-
-      // Rounded rectangle background
+    ctx.textBaseline = 'middle';
+    // Helper for label pills
+    const drawLabel = (label: string, percentage: number, x: number, color: string, actualNumber: number) => {
+      // Compact pill
+      const labelWidth = Math.max(60, iconWidth * 2.2);
+      const labelHeight = Math.max(32, iconHeight * 0.7);
+      const labelY = startY + iconHeight + Math.max(6, iconHeight * 0.08);
+      ctx.save();
       ctx.beginPath();
-      ctx.roundRect(x - labelWidth / 2, labelY, labelWidth, labelHeight, 12);
+      ctx.fillStyle = '#F8FAFC';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.2;
+      ctx.roundRect(x - labelWidth / 2, labelY, labelWidth, labelHeight, 8);
       ctx.fill();
       ctx.stroke();
-
-      // Count
+      ctx.restore();
+      // Actual number
       ctx.fillStyle = color;
-      ctx.font = 'bold 24px Inter';
-      ctx.fillText(count.toString(), x, labelY + 30);
-
+      ctx.font = `bold ${Math.max(12, Math.round(labelHeight * 0.38))}px Inter, Arial, sans-serif`;
+      ctx.fillText(actualNumber.toLocaleString(), x, labelY + labelHeight * 0.38);
       // Label
-      ctx.font = '16px Inter';
-      ctx.fillText(label, x, labelY + 50);
-
+      ctx.font = `${Math.max(10, Math.round(labelHeight * 0.28))}px Inter, Arial, sans-serif`;
+      ctx.fillText(label, x, labelY + labelHeight * 0.62);
       // Percentage
-      ctx.font = '14px Inter';
-      ctx.fillText(`${percentage}%`, x, labelY + 70);
+      ctx.font = `${Math.max(9, Math.round(labelHeight * 0.22))}px Inter, Arial, sans-serif`;
+      ctx.fillText(`${percentage}%`, x, labelY + labelHeight * 0.84);
     };
-
     // Draw female label
-    drawLabel(
-      femaleFigures,
-      'FEMALE',
-      femalePercentage,
-      startX + (femaleFigures * (iconWidth + spacing)) / 2,
-      '#EC4899'
-    );
-
+    if (femaleFigures > 0) {
+      const femaleLabelX = startX + (femaleFigures * (iconWidth + spacing)) / 2 - (iconWidth + spacing) / 2;
+      drawLabel('FEMALE', femalePercentage, femaleLabelX, '#EC4899', femaleNumber);
+    }
     // Draw male label
-    drawLabel(
-      maleFigures,
-      'MALE',
-      malePercentage,
-      startX + (femaleFigures * (iconWidth + spacing)) + (maleFigures * (iconWidth + spacing)) / 2,
-      '#3B82F6'
-    );
-
-  }, [monthlyGenderData, selectedMonth]);
+    if (maleFigures > 0) {
+      const maleLabelX = startX + (femaleFigures * (iconWidth + spacing)) + (maleFigures * (iconWidth + spacing)) / 2 - (iconWidth + spacing) / 2;
+      drawLabel('MALE', malePercentage, maleLabelX, '#3B82F6', maleNumber);
+    }
+    // Optional: subtle border for the canvas
+    ctx.save();
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0, 0, width, height);
+    ctx.restore();
+  }, [genderData, totalApplicants, femaleNumber, maleNumber]);
 
   useEffect(() => {
     drawChart();
-    const handleResize = () => {
-      drawChart();
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [drawChart]);
+    if (!containerRef.current) return;
+    // Redraw on resize
+    const ro = new window.ResizeObserver(() => drawChart());
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [drawChart, forceRedraw]);
 
   return (
-    <div className="w-full h-full flex items-center justify-center">
+    <div ref={containerRef} className="w-full h-full flex items-center justify-center" style={{ minHeight: 0, minWidth: 0 }}>
       <canvas
-        ref={canvasRef}
+        ref={actualCanvasRef}
         style={{
           width: '100%',
           height: '100%',
-          maxWidth: '800px'
+          display: 'block',
+          maxWidth: '100%',
+          maxHeight: '100%'
         }}
       />
     </div>
@@ -238,6 +235,13 @@ export default function DashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [dashboardData, setDashboardData] = useState(getDashboardData('2024'));
   const dashboardRef = useRef<HTMLDivElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null); // Hidden export container
+  // Chart.js refs for native export
+  const barRef = useRef<any>(null);
+  const jobsRef = useRef<any>(null);
+  const genderRef = useRef<any>(null);
+  const educationRef = useRef<any>(null);
+  const sectorRef = useRef<any>(null);
   const chartRefs = {
     performance: useRef<HTMLDivElement>(null),
     jobs: useRef<HTMLDivElement>(null),
@@ -245,6 +249,8 @@ export default function DashboardPage() {
     education: useRef<HTMLDivElement>(null),
     sector: useRef<HTMLDivElement>(null)
   };
+  const [monthGroup, setMonthGroup] = useState(0); // 0: Jan–Apr, 1: May–Aug, 2: Sep–Dec
+  const genderCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "null");
@@ -413,20 +419,18 @@ export default function DashboardPage() {
   const handleExportDashboard = async () => {
     setIsExporting(true);
     try {
-      if (dashboardRef.current) {
+      if (exportRef.current) {
         const timestamp = new Date().toISOString().split('T')[0];
         const filename = `DOLE-Dashboard-${selectedPeriod}-${selectedMonth}-${timestamp}.png`;
-
-        await exportToImage(dashboardRef.current, filename, {
-          windowWidth: dashboardRef.current.scrollWidth,
-          windowHeight: dashboardRef.current.scrollHeight,
-          backgroundColor: '#f9fafb',
-          delay: 500 // Wait for charts to render
+        await exportToImage(exportRef.current, filename, {
+          windowWidth: exportRef.current.scrollWidth,
+          windowHeight: exportRef.current.scrollHeight,
+          backgroundColor: '#ffffff',
+          delay: 800 // Wait for charts to render
         });
       }
     } catch (error) {
       console.error('Export error:', error);
-      // You might want to add error handling UI here
     } finally {
       setIsExporting(false);
     }
@@ -435,23 +439,105 @@ export default function DashboardPage() {
   const handleExportChart = async (chartName: string) => {
     setIsExporting(true);
     try {
-      const chartRef = chartRefs[chartName as keyof typeof chartRefs];
-      if (chartRef.current) {
-        const timestamp = new Date().toISOString().split('T')[0];
-        const filename = `DOLE-${chartName}-${selectedPeriod}-${selectedMonth}-${timestamp}.png`;
-
-        await exportToImage(chartRef.current, filename, {
-          backgroundColor: '#ffffff',
-          delay: 300 // Wait for chart to render
-        });
+      let chartInstance = null;
+      let filename = '';
+      const timestamp = new Date().toISOString().split('T')[0];
+      switch (chartName) {
+        case 'performance':
+          chartInstance = barRef.current;
+          filename = `DOLE-performance-${selectedPeriod}-${selectedMonth}-${timestamp}.png`;
+          break;
+        case 'jobs':
+          chartInstance = jobsRef.current;
+          filename = `DOLE-jobs-${selectedPeriod}-${selectedMonth}-${timestamp}.png`;
+          break;
+        case 'gender':
+          if (genderCanvasRef.current) {
+            const url = genderCanvasRef.current.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `DOLE-gender-${selectedPeriod}-${selectedMonth}-${timestamp}.png`;
+            link.click();
+          }
+          setIsExporting(false);
+          return;
+        case 'education':
+          chartInstance = educationRef.current;
+          filename = `DOLE-education-${selectedPeriod}-${selectedMonth}-${timestamp}.png`;
+          break;
+        case 'sector':
+          chartInstance = sectorRef.current;
+          filename = `DOLE-sector-${selectedPeriod}-${selectedMonth}-${timestamp}.png`;
+          break;
+      }
+      if (chartInstance && chartInstance.toBase64Image) {
+        const url = chartInstance.toBase64Image();
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+      } else {
+        // fallback to exportToImage if not Chart.js
+        const chartRef = chartRefs[chartName as keyof typeof chartRefs];
+        if (chartRef.current) {
+          await exportToImage(chartRef.current, filename, {
+            backgroundColor: '#ffffff',
+            delay: 300
+          });
+        }
       }
     } catch (error) {
       console.error('Export error:', error);
-      // You might want to add error handling UI here
     } finally {
       setIsExporting(false);
     }
   };
+
+  // Helper to get the current 4-month group labels and data
+  const getMonthlyGroupData = () => {
+    const startIdx = monthGroup * 4;
+    const endIdx = startIdx + 4;
+    const labels = dashboardData.monthlyData.labels.slice(startIdx, endIdx);
+    const datasets = dashboardData.monthlyData.datasets.map(ds => ({
+      ...ds,
+      data: ds.data.slice(startIdx, endIdx)
+    }));
+    return { labels, datasets };
+  };
+  const monthlyGroupData = getMonthlyGroupData();
+
+  // Compute genderData for the chart
+  let genderData;
+  if (selectedMonth === 'all') {
+    // Average all months
+    const months = dashboardData.monthlyGenderData;
+    const totalMale = months.reduce((sum, m) => sum + m.male, 0);
+    const totalFemale = months.reduce((sum, m) => sum + m.female, 0);
+    const avgMale = Math.round(totalMale / months.length);
+    const avgFemale = Math.round(totalFemale / months.length);
+    genderData = { male: avgMale, female: avgFemale };
+  } else {
+    genderData = dashboardData.monthlyGenderData[parseInt(selectedMonth)] || { male: 0, female: 0 };
+  }
+
+  // Compute correct femaleNumber and maleNumber
+  let femaleNumber = 0;
+  let maleNumber = 0;
+  if (selectedMonth === 'all') {
+    // Sum actual female and male applicants for each month
+    const months = dashboardData.monthlyGenderData;
+    const applicants = dashboardData.monthlyData.datasets[1].data;
+    for (let i = 0; i < months.length; i++) {
+      femaleNumber += Math.round(applicants[i] * (months[i].female / 100));
+      maleNumber += Math.round(applicants[i] * (months[i].male / 100));
+    }
+  } else {
+    const monthIndex = parseInt(selectedMonth);
+    const applicants = dashboardData.monthlyData.datasets[1].data[monthIndex] || 0;
+    const monthGender = dashboardData.monthlyGenderData[monthIndex] || { male: 0, female: 0 };
+    femaleNumber = Math.round(applicants * (monthGender.female / 100));
+    maleNumber = Math.round(applicants * (monthGender.male / 100));
+  }
 
   if (!user) return null;
 
@@ -494,6 +580,7 @@ export default function DashboardPage() {
     ...commonChartOptions,
     scales: {
       x: {
+        stacked: true,
         grid: {
           display: true,
           color: 'rgba(0, 0, 0, 0.05)',
@@ -507,6 +594,7 @@ export default function DashboardPage() {
         },
       },
       y: {
+        stacked: true,
         grid: {
           display: true,
           color: 'rgba(0, 0, 0, 0.05)',
@@ -615,231 +703,172 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
-        {/* Enhanced Dashboard Header */}
-        <div className="mb-8 bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="space-y-2">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600">
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </span>
-                {user.role === 'admin' ? 'PESO Employment Analytics' : `${user.address} Employment Report`}
-              </h1>
-              <p className="text-gray-600 ml-[60px]">
-                {user.role === 'admin'
-                  ? 'Comprehensive overview of employment statistics across 26 PESO LGUs'
-                  : `Monthly performance metrics for ${user.name || 'Your Municipality'}`
-                }
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="flex items-center gap-4">
-                <div className="flex flex-col min-w-[140px]">
-                  <label htmlFor="month-select" className="text-sm font-medium text-gray-700 mb-1.5">Select Month</label>
-                  <select
-                    id="month-select"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="block w-full rounded-lg border-gray-200 bg-white px-4 py-2.5 text-gray-800 shadow-sm hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm font-medium transition-colors duration-200"
-                  >
-                    <option value="all">All Months</option>
-                    {['January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December'].map((month, index) => (
-                        <option key={month} value={index}>{month}</option>
-                      ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col min-w-[120px]">
-                  <label htmlFor="year-select" className="text-sm font-medium text-gray-700 mb-1.5">Select Year</label>
-                  <select
-                    id="year-select"
-                    value={selectedPeriod}
-                    onChange={(e) => setSelectedPeriod(e.target.value)}
-                    className="block w-full rounded-lg border-gray-200 bg-white px-4 py-2.5 text-gray-800 shadow-sm hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm font-medium transition-colors duration-200"
-                  >
-                    <option value="2024">2024</option>
-                    <option value="2023">2023</option>
-                    <option value="2022">2022</option>
-                  </select>
-                </div>
+    <>
+      {/* Visible dashboard */}
+      <div ref={dashboardRef} className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
+          {/* Enhanced Dashboard Header */}
+          <div className="mb-8 bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="space-y-2">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
+                  <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600">
+                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </span>
+                  {user.role === 'admin' ? 'PESO Employment Analytics' : `${user.address} Employment Report`}
+                </h1>
+                <p className="text-gray-600 ml-[60px]">
+                  {user.role === 'admin'
+                    ? 'Comprehensive overview of employment statistics across 26 PESO LGUs'
+                    : `Monthly performance metrics for ${user.address || 'Your Municipality'}`
+                  }
+                </p>
               </div>
 
-              <button
-                onClick={handleExportDashboard}
-                disabled={isExporting}
-                className="inline-flex items-center px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-blue-300 disabled:cursor-not-allowed transition-all duration-200 shadow-sm ml-2"
-              >
-                {isExporting ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Exporting...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Export Dashboard
-                  </>
-                )}
-              </button>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex flex-col min-w-[140px]">
+                    <label htmlFor="month-select" className="text-sm font-medium text-gray-700 mb-1.5">Select Month</label>
+                    <select
+                      id="month-select"
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      className="block w-full rounded-lg border-gray-200 bg-white px-4 py-2.5 text-gray-800 shadow-sm hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm font-medium transition-colors duration-200"
+                    >
+                      <option value="all">All Months</option>
+                      {['January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'].map((month, index) => (
+                          <option key={month} value={index}>{month}</option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col min-w-[120px]">
+                    <label htmlFor="year-select" className="text-sm font-medium text-gray-700 mb-1.5">Select Year</label>
+                    <select
+                      id="year-select"
+                      value={selectedPeriod}
+                      onChange={(e) => setSelectedPeriod(e.target.value)}
+                      className="block w-full rounded-lg border-gray-200 bg-white px-4 py-2.5 text-gray-800 shadow-sm hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm font-medium transition-colors duration-200"
+                    >
+                      <option value="2024">2024</option>
+                      <option value="2023">2023</option>
+                      <option value="2022">2022</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleExportDashboard}
+                  disabled={isExporting}
+                  className="inline-flex items-center px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-blue-300 disabled:cursor-not-allowed transition-all duration-200 shadow-sm ml-2"
+                >
+                  {isExporting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Export Dashboard
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Enhanced Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {Object.entries(dashboardData.quickStats).map(([key, stat], index) => {
-            const icons = [
-              <svg key="1" className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>,
-              <svg key="2" className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>,
-              <svg key="3" className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>,
-              <svg key="4" className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-              </svg>
-            ];
+          {/* Enhanced Quick Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {Object.entries(dashboardData.quickStats).map(([key, stat], index) => {
+              const icons = [
+                <svg key="1" className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>,
+                <svg key="2" className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>,
+                <svg key="3" className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>,
+                <svg key="4" className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                </svg>
+              ];
 
-            const bgGradients = [
-              'from-blue-50 to-blue-100/50',
-              'from-green-50 to-green-100/50',
-              'from-yellow-50 to-yellow-100/50',
-              'from-red-50 to-red-100/50'
-            ];
+              const bgGradients = [
+                'from-blue-50 to-blue-100/50',
+                'from-green-50 to-green-100/50',
+                'from-yellow-50 to-yellow-100/50',
+                'from-red-50 to-red-100/50'
+              ];
 
-            const iconColors = [
-              'text-blue-600',
-              'text-green-600',
-              'text-yellow-600',
-              'text-red-600'
-            ];
+              const iconColors = [
+                'text-blue-600',
+                'text-green-600',
+                'text-yellow-600',
+                'text-red-600'
+              ];
 
-            const borderColors = [
-              'border-blue-100',
-              'border-green-100',
-              'border-yellow-100',
-              'border-red-100'
-            ];
+              const borderColors = [
+                'border-blue-100',
+                'border-green-100',
+                'border-yellow-100',
+                'border-red-100'
+              ];
 
-            return (
-              <div 
-                key={key} 
-                className={`bg-gradient-to-br ${bgGradients[index]} rounded-2xl p-6 shadow-lg border ${borderColors[index]} hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1`}
-              >
-                <div className="flex items-start">
-                  <div className={`p-3 rounded-xl bg-white/80 backdrop-blur-sm ${iconColors[index]} shadow-sm`}>
-                    {icons[index]}
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-sm font-medium text-gray-600 capitalize mb-1">
-                      {key.replace(/([A-Z])/g, ' $1').trim()}
-                    </h3>
-                    <p className="text-2xl font-bold text-gray-900 mb-2">
-                      {stat.value.toLocaleString()}
-                    </p>
-                    <div className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm ${
-                      stat.change > 0 
-                        ? 'bg-green-100 text-green-700' 
+              return (
+                <div
+                  key={key}
+                  className={`bg-gradient-to-br ${bgGradients[index]} rounded-2xl p-6 shadow-lg border ${borderColors[index]} hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1`}
+                >
+                  <div className="flex items-start">
+                    <div className={`p-3 rounded-xl bg-white/80 backdrop-blur-sm ${iconColors[index]} shadow-sm`}>
+                      {icons[index]}
+                    </div>
+                    <div className="ml-4">
+                      <h3 className="text-sm font-medium text-gray-600 capitalize mb-1">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </h3>
+                      <p className="text-2xl font-bold text-gray-900 mb-2">
+                        {stat.value.toLocaleString()}
+                      </p>
+                      <div className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm ${stat.change > 0
+                        ? 'bg-green-100 text-green-700'
                         : 'bg-red-100 text-red-700'
-                    }`}>
-                      <svg 
-                        className={`w-4 h-4 mr-1 ${stat.change > 0 ? 'rotate-0' : 'rotate-180'}`} 
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                      </svg>
-                      {Math.abs(stat.change)}%
+                        }`}>
+                        <svg
+                          className={`w-4 h-4 mr-1 ${stat.change > 0 ? 'rotate-0' : 'rotate-180'}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                        {Math.abs(stat.change)}%
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 gap-8">
-          {/* Monthly Performance Chart */}
-          <section 
-            ref={chartRefs.performance} 
-            className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-600">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </span>
-                  Monthly PESO Performance
-                </h2>
-                <p className="text-sm text-gray-500 mt-2 ml-[52px]">
-                  Track monthly employment facilitation progress
-                </p>
-              </div>
-              <button
-                onClick={() => handleExportChart('performance')}
-                disabled={isExporting}
-                className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
-              >
-                {isExporting ? 'Exporting...' : 'Export Chart'}
-              </button>
-            </div>
-            <div className="h-[400px] w-full">
-              <Bar data={dashboardData.monthlyData} options={lineChartOptions} />
-            </div>
-          </section>
-
-          {/* Top Available Jobs */}
-          <section ref={chartRefs.jobs} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                  <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-600">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </span>
-                  Top 10 Available Jobs
-                </h2>
-                <p className="text-sm text-gray-500 mt-2 ml-[52px]">
-                  Most in-demand positions across all LGUs
-                </p>
-              </div>
-              <button
-                onClick={() => handleExportChart('jobs')}
-                disabled={isExporting}
-                className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
-              >
-                {isExporting ? 'Exporting...' : 'Export Chart'}
-              </button>
-            </div>
-            <div className="h-[400px] w-full">
-              <Bar data={dashboardData.topJobsData} options={barChartOptions} />
-            </div>
-          </section>
-
-          {/* Statistics Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Gender Distribution */}
-            <section ref={chartRefs.gender} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+              );
+            })}
+          </div>
+          <hr className="my-8 border-t-2 border-gray-200" />
+          {/* Charts Grid */}
+          <div className="grid grid-cols-1 gap-8">
+            {/* Monthly Performance Chart */}
+            <section
+              ref={chartRefs.performance}
+              className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
+            >
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
@@ -848,30 +877,40 @@ export default function DashboardPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </span>
-                    Gender Distribution
+                    Monthly PESO Performance
                   </h2>
                   <p className="text-sm text-gray-500 mt-2 ml-[52px]">
-                    Gender of Registered Applicants
+                    Track monthly employment facilitation progress
                   </p>
                 </div>
-                <button
-                  onClick={() => handleExportChart('gender')}
-                  disabled={isExporting}
-                  className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
-                >
-                  {isExporting ? 'Exporting...' : 'Export'}
-                </button>
+                <div className="flex items-center gap-4">
+                  <label htmlFor="month-group-select" className="text-sm font-medium text-gray-700">Show Months</label>
+                  <select
+                    id="month-group-select"
+                    value={monthGroup}
+                    onChange={e => setMonthGroup(Number(e.target.value))}
+                    className="block rounded-lg border-gray-200 bg-white px-3 py-2 text-gray-800 shadow-sm hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm font-medium transition-colors duration-200"
+                  >
+                    <option value={0}>Jan - Apr</option>
+                    <option value={1}>May - Aug</option>
+                    <option value={2}>Sep - Dec</option>
+                  </select>
+                  <button
+                    onClick={() => handleExportChart('performance')}
+                    disabled={isExporting}
+                    className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
+                  >
+                    {isExporting ? 'Exporting...' : 'Export Chart'}
+                  </button>
+                </div>
               </div>
-              <div className="h-[300px]">
-                <GenderDistributionChart
-                  monthlyGenderData={dashboardData.monthlyGenderData}
-                  selectedMonth={selectedMonth}
-                />
+              <div className="h-[400px] w-full">
+                <Bar ref={barRef} data={monthlyGroupData} options={lineChartOptions} />
               </div>
             </section>
 
-            {/* Educational Attainment */}
-            <section ref={chartRefs.education} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+            {/* Top Available Jobs */}
+            <section ref={chartRefs.jobs} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
@@ -880,56 +919,136 @@ export default function DashboardPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </span>
-                    Educational Background
+                    Top 10 Available Jobs
                   </h2>
                   <p className="text-sm text-gray-500 mt-2 ml-[52px]">
-                    Applicants by Educational Attainment
+                    Most in-demand positions across all LGUs
                   </p>
                 </div>
                 <button
-                  onClick={() => handleExportChart('education')}
+                  onClick={() => handleExportChart('jobs')}
                   disabled={isExporting}
                   className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
                 >
-                  {isExporting ? 'Exporting...' : 'Export'}
+                  {isExporting ? 'Exporting...' : 'Export Chart'}
                 </button>
               </div>
-              <div className="h-[300px]">
-                <Pie data={dashboardData.educationData} options={pieChartOptions} />
+              <div className="h-[400px] w-full">
+                <Bar ref={jobsRef} data={dashboardData.topJobsData} options={barChartOptions} />
               </div>
             </section>
 
-            {/* Sector Distribution */}
-            <section ref={chartRefs.sector} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                    <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-600">
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                    </span>
-                    Employment Sectors
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-2 ml-[52px]">
-                    Placed Applicants in Private vs Government Sector
-                  </p>
+            {/* Statistics Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Gender Distribution */}
+              <section ref={chartRefs.gender} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-600">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </span>
+                      Gender Distribution
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-2 ml-[52px]">
+                      Gender of Registered Applicants
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleExportChart('gender')}
+                    disabled={isExporting}
+                    className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
+                  >
+                    {isExporting ? 'Exporting...' : 'Export'}
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleExportChart('sector')}
-                  disabled={isExporting}
-                  className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
-                >
-                  {isExporting ? 'Exporting...' : 'Export'}
-                </button>
-              </div>
-              <div className="h-[300px]">
-                <Pie data={dashboardData.sectorData} options={pieChartOptions} />
-              </div>
-            </section>
+                <div className="h-[300px]">
+                  <GenderDistributionChart
+                    genderData={genderData}
+                    totalApplicants={(() => {
+                      if (selectedMonth === 'all') {
+                        // Sum all months
+                        return dashboardData.monthlyData.datasets[1].data.reduce((a, b) => a + b, 0);
+                      } else {
+                        // Single month
+                        return dashboardData.monthlyData.datasets[1].data[parseInt(selectedMonth)] || 0;
+                      }
+                    })()}
+                    femaleNumber={femaleNumber}
+                    maleNumber={maleNumber}
+                    canvasRef={genderCanvasRef}
+                  />
+                </div>
+              </section>
+
+              {/* Educational Attainment */}
+              <section ref={chartRefs.education} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-600">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </span>
+                      Educational Background
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-2 ml-[52px]">
+                      Applicants by Educational Attainment
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleExportChart('education')}
+                    disabled={isExporting}
+                    className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
+                  >
+                    {isExporting ? 'Exporting...' : 'Export'}
+                  </button>
+                </div>
+                <div className="h-[300px]">
+                  <Pie ref={educationRef} data={dashboardData.educationData} options={pieChartOptions} />
+                </div>
+              </section>
+
+              {/* Sector Distribution */}
+              <section ref={chartRefs.sector} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-600">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </span>
+                      Employment Sectors
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-2 ml-[52px]">
+                      Placed Applicants in Private vs Government Sector
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleExportChart('sector')}
+                    disabled={isExporting}
+                    className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
+                  >
+                    {isExporting ? 'Exporting...' : 'Export'}
+                  </button>
+                </div>
+                <div className="h-[300px]">
+                  <Pie ref={sectorRef} data={dashboardData.sectorData} options={pieChartOptions} />
+                </div>
+              </section>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+      {/* Hidden export container for dashboard export */}
+      <div ref={exportRef} style={{ position: 'absolute', left: '-9999px', top: 0, width: '1400px' }}>
+        {/* TODO: Render the same dashboard content here for export (copy the dashboard JSX) */}
+        <div>Export container ready</div>
+      </div>
+    </>
   );
 }

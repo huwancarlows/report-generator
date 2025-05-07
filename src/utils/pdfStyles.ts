@@ -50,11 +50,11 @@ export const pdfStyles: PDFStyles = {
             halign: 'center'
         },
         columnStyles: {
-            0: { cellWidth: 15 }, // KRA
-            1: { cellWidth: 45 }, // PROGRAM/INDICATOR
+            0: { cellWidth: 30 }, // KRA
+            1: { cellWidth: 60 }, // INDICATOR
             2: { cellWidth: 80 }, // OTHER SPECIFICATION
-            3: { cellWidth: 25, halign: 'center' as const }, // PREVIOUS
-            4: { cellWidth: 25, halign: 'center' as const } // CURRENT
+            3: { cellWidth: 40, halign: 'center' as const, valign: 'middle' as const }, // PREVIOUS
+            4: { cellWidth: 40, halign: 'center' as const, valign: 'middle' as const }  // CURRENT
         },
         margin: { left: 15, right: 15 },
         showFoot: 'lastPage',
@@ -67,6 +67,32 @@ export const pdfStyles: PDFStyles = {
             // Ensure text wrapping for long content
             if (data.cell.raw && typeof data.cell.raw === 'string') {
                 data.cell.styles.cellWidth = 'wrap';
+
+                // Handle hierarchical indentation
+                const text = data.cell.raw;
+                const level = getIndentationLevel(text);
+
+                // Apply indentation based on level
+                if (level > 0) {
+                    data.cell.styles.cellPadding = [3, 3 + (level * 4), 3, 3];
+                }
+
+                // Style based on content
+                if (text.toLowerCase().includes('female')) {
+                    data.cell.styles.fontStyle = 'italic';
+                    data.cell.styles.textColor = [128, 0, 128]; // Purple color for female entries
+                }
+
+                // Style main categories
+                if (level === 0 && /^\d+\.\s/.test(text)) {
+                    data.cell.styles.fontStyle = 'bold';
+                }
+
+                // Style sub-categories
+                if (level === 1 && /^\d+\.\d+\.\s/.test(text)) {
+                    data.cell.styles.fontStyle = 'bold';
+                }
+
                 // Align program/indicator and specification cells to top
                 if (data.column.index === 1 || data.column.index === 2) {
                     data.cell.styles.valign = 'top';
@@ -75,12 +101,28 @@ export const pdfStyles: PDFStyles = {
         }
     },
     footer: {
-        startY: 15, // Space from last table row
-        signatureSpacing: 10, // Space between signature lines
-        dateSpacing: 25, // Space for date section
-        noteSpacing: 35 // Space for the note section
+        startY: 15,
+        signatureSpacing: 10,
+        dateSpacing: 25,
+        noteSpacing: 35
     }
 };
+
+// Helper function to determine indentation level
+function getIndentationLevel(text: string): number {
+    if (!text) return 0;
+
+    // Count the number of dots in the numbering
+    const dotCount = (text.match(/\./g) || []).length;
+
+    // Determine level based on the pattern
+    if (/^\d+\.\d+\.\d+\.\d+\./.test(text)) return 3; // Level 4 (e.g., 1.1.1.1)
+    if (/^\d+\.\d+\.\d+\./.test(text)) return 2;      // Level 3 (e.g., 1.1.1)
+    if (/^\d+\.\d+\./.test(text)) return 1;           // Level 2 (e.g., 1.1)
+    if (/^\d+\./.test(text)) return 0;                // Level 1 (e.g., 1)
+
+    return 0;
+}
 
 export const tableHeaders = [
     ['KRA', 'INDICATOR', 'OTHER SPECIFICATION', 'PREVIOUS', 'CURRENT'],

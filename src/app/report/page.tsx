@@ -5,16 +5,154 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { reportService } from '@/services/reportService';
 import { toast } from 'react-hot-toast';
-import { ProgramType, EmploymentFacilitation } from "@/types/database.types";
+import { ProgramType, EmploymentFacilitation, EmploymentFacilitationRow } from "@/types/database.types";
+import { programOptions, indicatorOptions, subIndicatorOptions } from "@/constants/indicatorOptions";
 
 // Import types from a shared location
 import {
-  EmploymentFacilitationRow,
-  ReportData,
   FieldType,
   IndicatorOption,
   IndicatorOptionsMap
 } from '@/types/report.types';
+
+import QuickAddModal, { QuickAddData } from './QuickAddModal';
+
+interface ReportData {
+  employmentFacilitation: EmploymentFacilitationRow[];
+  reportingPeriod: string;
+  reportingOffice: string;
+}
+
+// Utility to generate all possible rows
+function generateAllEmploymentRows(): EmploymentFacilitationRow[] {
+  const rows: EmploymentFacilitationRow[] = [];
+  programOptions.forEach((program) => {
+    const indicators = indicatorOptions[program.value] || [];
+    indicators.forEach((indicator) => {
+      const subIndicators = subIndicatorOptions[indicator.value] || [];
+      if (subIndicators.length > 0) {
+        // Special case: if the only sub-indicator is 'FEMALE', treat as indicator with sub_sub_indicator: 'FEMALE'
+        if (subIndicators.length === 1 && subIndicators[0].value === 'FEMALE') {
+          rows.push({
+            program: program.value as ProgramType,
+            indicator: indicator.value,
+            sub_indicator: '',
+            sub_sub_indicator: '',
+            previous_report_period: 0,
+            current_period: 0,
+            previous_female_count: 0,
+            current_female_count: 0,
+            remarks: ""
+          });
+          rows.push({
+            program: program.value as ProgramType,
+            indicator: indicator.value,
+            sub_indicator: 'FEMALE',
+            sub_sub_indicator: '',
+            previous_report_period: 0,
+            current_period: 0,
+            previous_female_count: 0,
+            current_female_count: 0,
+            remarks: ""
+          });
+        } else {
+          subIndicators.forEach((subInd) => {
+            // Always add the total row for the sub-indicator
+            rows.push({
+              program: program.value as ProgramType,
+              indicator: indicator.value,
+              sub_indicator: subInd.value,
+              sub_sub_indicator: '',
+              previous_report_period: 0,
+              current_period: 0,
+              previous_female_count: 0,
+              current_female_count: 0,
+              remarks: ""
+            });
+            // Add all sub-sub-indicator rows (including 'FEMALE')
+            const subSubIndicators = subIndicatorOptions[subInd.value] || [];
+            subSubIndicators.forEach((subSubInd) => {
+              rows.push({
+                program: program.value as ProgramType,
+                indicator: indicator.value,
+                sub_indicator: subInd.value,
+                sub_sub_indicator: subSubInd.value,
+                previous_report_period: 0,
+                current_period: 0,
+                previous_female_count: 0,
+                current_female_count: 0,
+                remarks: ""
+              });
+            });
+            // If the sub-indicator itself is 'FEMALE' and there are no sub-sub-indicators, add a row for it
+            if (subSubIndicators.length === 0 && subInd.value === 'FEMALE') {
+              rows.push({
+                program: program.value as ProgramType,
+                indicator: indicator.value,
+                sub_indicator: subInd.value,
+                sub_sub_indicator: '',
+                previous_report_period: 0,
+                current_period: 0,
+                previous_female_count: 0,
+                current_female_count: 0,
+                remarks: ""
+              });
+            }
+          });
+        }
+      } else {
+        // No subIndicators, just add the indicator row
+        rows.push({
+          program: program.value as ProgramType,
+          indicator: indicator.value,
+          sub_indicator: '',
+          sub_sub_indicator: '',
+          previous_report_period: 0,
+          current_period: 0,
+          previous_female_count: 0,
+          current_female_count: 0,
+          remarks: ""
+        });
+      }
+    });
+  });
+  // Debug output of all generated rows
+  if (typeof window !== 'undefined') {
+    console.group('generateAllEmploymentRows() output');
+    console.table(rows.map(r => ({
+      program: r.program,
+      indicator: r.indicator,
+      sub_indicator: r.sub_indicator,
+      sub_sub_indicator: r.sub_sub_indicator
+    })));
+    console.groupEnd();
+  }
+  return rows;
+}
+
+// Helper to get correct subIndicatorOptions key for APPLICANTS_REGISTERED
+function getApplicantsRegisteredSubIndicatorKey(indicator: string) {
+  switch (indicator) {
+    case 'REGULAR_PROGRAM':
+      return 'REGULAR_PROGRAM_APPLICANTS';
+    case 'SPES':
+      return 'SPES_APPLICANTS';
+    case 'WAP':
+      return 'WAP_APPLICANTS';
+    case 'TULAY':
+      return 'TULAY_APPLICANTS';
+    case 'RETRENCHED':
+      return 'RETRENCHED_APPLICANTS';
+    case 'OFWS':
+      return 'OFWS_APPLICANTS';
+    case 'MIGRATORY':
+      return 'MIGRATORY_APPLICANTS';
+    case 'RURAL':
+      return 'RURAL_APPLICANTS';
+    default:
+      return indicator;
+  }
+}
 
 export default function ReportPage() {
   const { user } = useAuth();
@@ -23,6 +161,7 @@ export default function ReportPage() {
   // Initial form state
   const initialFormState: ReportData = {
     employmentFacilitation: [
+
       {
         program: "JOB_VACANCIES" as ProgramType,
         indicator: "REGULAR_PROGRAM",
@@ -30,6 +169,8 @@ export default function ReportPage() {
         sub_sub_indicator: "FEMALE",
         previous_report_period: 0,
         current_period: 0,
+        previous_female_count: 0,
+        current_female_count: 0,
         remarks: ""
       }
     ],
@@ -37,15 +178,15 @@ export default function ReportPage() {
     reportingOffice: ""
   };
 
-  const [loading, setLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<{
-    [key: string]: string;
-  }>({});
-  const [showValidationErrors, setShowValidationErrors] = useState(true);
+  const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [showValidationErrors, setShowValidationErrors] = useState<boolean>(true);
   const [formData, setFormData] = useState<ReportData>(initialFormState);
+  const [showQuickAddModal, setShowQuickAddModal] = useState(false);
+  const [quickAddData, setQuickAddData] = useState<QuickAddData | null>(null);
 
   // Reset form to initial state
   const resetForm = () => {
@@ -70,21 +211,13 @@ export default function ReportPage() {
     }));
   }, [router]);
 
-  const isValidProgram = (program: string): program is ProgramType => {
-    return [
-      'JOB_VACANCIES',
-      'APPLICANTS_REGISTERED',
-      'APPLICANTS_REFERRED',
-      'APPLICANTS_PLACED',
-      'PWD_PROJECTS',
-      'PWD_TRAINING',
-      'APPLICANTS_COUNSELLED',
-      'APPLICANTS_TESTED',
-      'CAREER_GUIDANCE',
-      'JOB_FAIR',
-      'LIVELIHOOD'
-    ].includes(program);
-  };
+  // Always initialize all possible rows when reporting period or office changes
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      employmentFacilitation: generateAllEmploymentRows()
+    }));
+  }, [formData.reportingPeriod, formData.reportingOffice]);
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
@@ -114,13 +247,6 @@ export default function ReportPage() {
       if ((entry.current_female_count ?? 0) < 0) {
         newErrors[`row${index}_current_female`] = `Entry ${rowNumber}: Female count can't be negative`;
       }
-      // Validate that female counts don't exceed total counts
-      if ((entry.previous_female_count ?? 0) > entry.previous_report_period) {
-        newErrors[`row${index}_previous_female`] = `Entry ${rowNumber}: Female count can't exceed total count`;
-      }
-      if ((entry.current_female_count ?? 0) > entry.current_period) {
-        newErrors[`row${index}_current_female`] = `Entry ${rowNumber}: Female count can't exceed total count`;
-      }
     });
 
     setValidationErrors(newErrors);
@@ -148,111 +274,160 @@ export default function ReportPage() {
 
     try {
       // Process and structure the employment facilitation data
-      const processedEntries: Omit<EmploymentFacilitation, 'id' | 'report_id'>[] = [];
+      const processedEntries: Omit<EmploymentFacilitation, 'id' | 'report_id' | 'created_at' | 'updated_at'>[] = [];
 
-      // Helper function to check if an entry is a female sub-entry
-      const isFemaleSubEntry = (label: string) => {
-        // Check for patterns like "X.X.1 Female" where X is any number
-        const femalePattern = /\d+\.\d+\.1\s+Female$/;
-        return femalePattern.test(label);
-      };
+      programOptions.forEach((program: { value: ProgramType; label: string }) => {
+        const programValue = program.value as ProgramType;
+        const indicators = indicatorOptions[programValue] || [];
 
-      // Process all programs
-      programOptions.forEach(programOption => {
-        const program = programOption.value;
-        const indicators = indicatorOptions[program] || [];
+        indicators.forEach((indicator: IndicatorOption) => {
+          let subIndicators = subIndicatorOptions[indicator.value] || [];
+          // Patch: For APPLICANTS_REGISTERED, use the correct subIndicatorOptions key
+          if (programValue === 'APPLICANTS_REGISTERED') {
+            const correctKey = getApplicantsRegisteredSubIndicatorKey(indicator.value);
+            subIndicators = subIndicatorOptions[correctKey] || [];
+          }
+          const isSpecialCategory = ['RETRENCHED', 'OFWS', 'MIGRATORY', 'RURAL'].includes(indicator.value);
 
-        // Process each indicator for this program
-        indicators.forEach(indicator => {
-          const subIndicators = subIndicatorOptions[indicator.value] || [];
+          if (isSpecialCategory) {
+            // Total row
+            const totalRow = formData.employmentFacilitation.find(
+              entry => entry.program === programValue &&
+                entry.indicator === indicator.value &&
+                entry.sub_indicator === '' &&
+                entry.sub_sub_indicator === ''
+            );
+            if (totalRow) {
+              processedEntries.push({
+                program: programValue,
+                indicator: indicator.value,
+                sub_indicator: '',
+                sub_sub_indicator: '',
+                previous_report_period: totalRow.previous_report_period,
+                current_period: totalRow.current_period,
+                previous_female_count: null,
+                current_female_count: null,
+                remarks: totalRow.remarks || ''
+              });
+            }
+            // Female row
+            const femaleRow = formData.employmentFacilitation.find(
+              entry => entry.program === programValue &&
+                entry.indicator === indicator.value &&
+                entry.sub_indicator === '' &&
+                entry.sub_sub_indicator === 'FEMALE'
+            );
+            if (femaleRow) {
+              processedEntries.push({
+                program: programValue,
+                indicator: indicator.value,
+                sub_indicator: '',
+                sub_sub_indicator: 'FEMALE',
+                previous_report_period: 0,
+                current_period: 0,
+                previous_female_count: femaleRow.previous_female_count || 0,
+                current_female_count: femaleRow.current_female_count || 0,
+                remarks: femaleRow.remarks || ''
+              });
+            }
+            return; // Skip normal subIndicator/subSubIndicator logic for these
+          }
 
           if (subIndicators.length > 0) {
-            // Process sub-indicators
-            subIndicators.forEach(subInd => {
-              // Find the matching entry in formData
+            subIndicators.forEach((subInd: IndicatorOption) => {
+              const isFemaleSubIndicator = subInd.value.includes("FEMALE");
+
               const mainEntry = formData.employmentFacilitation.find(
-                entry => entry.program === program &&
+                entry => entry.program === programValue &&
                   entry.indicator === indicator.value &&
                   entry.sub_indicator === subInd.value &&
-                  !entry.sub_sub_indicator
+                  (!entry.sub_sub_indicator || entry.sub_sub_indicator === "")
               );
 
-              // Check if this is a female sub-entry by its label pattern
-              if (isFemaleSubEntry(subInd.label)) {
-                // This is a female entry (like 3.5.1 Female)
-                // Find the parent entry to get the main counts
-                const parentEntry = formData.employmentFacilitation.find(
-                  entry => entry.program === program &&
-                    entry.indicator === indicator.value &&
-                    !entry.sub_indicator
-                );
+              const subSubIndicators = subIndicatorOptions[subInd.value] || [];
 
-                processedEntries.push({
-                  program,
-                  indicator: indicator.value,
-                  sub_indicator: subInd.value,
-                  sub_sub_indicator: 'FEMALE',
-                  previous_report_period: mainEntry?.previous_female_count || 0,
-                  current_period: mainEntry?.current_female_count || 0,
-                  remarks: mainEntry?.remarks || null
+              if (subSubIndicators.length > 0) {
+                subSubIndicators.forEach((subSubInd: IndicatorOption) => {
+                  const isFemaleEntry = subSubInd.value.includes("FEMALE");
+
+                  if (isFemaleEntry) {
+                    const femaleEntry = formData.employmentFacilitation.find(
+                      entry => entry.program === programValue &&
+                        entry.indicator === indicator.value &&
+                        entry.sub_indicator === subInd.value &&
+                        entry.sub_sub_indicator === subSubInd.value
+                    );
+
+                    if (femaleEntry) {
+                      // Store in female fields, not total fields
+                      processedEntries.push({
+                        program: programValue,
+                        indicator: indicator.value,
+                        sub_indicator: subInd.value,
+                        sub_sub_indicator: subSubInd.value,
+                        previous_report_period: 0,
+                        current_period: 0,
+                        previous_female_count: femaleEntry.previous_female_count || 0,
+                        current_female_count: femaleEntry.current_female_count || 0,
+                        remarks: femaleEntry.remarks || ""
+                      });
+                    }
+                  }
                 });
-              } else {
-                // Regular entry
-                processedEntries.push({
-                  program,
-                  indicator: indicator.value,
-                  sub_indicator: subInd.value,
-                  sub_sub_indicator: null,
-                  previous_report_period: mainEntry?.previous_report_period || 0,
-                  current_period: mainEntry?.current_period || 0,
-                  remarks: mainEntry?.remarks || null
-                });
+              }
 
-                // Check for explicit FEMALE sub-sub-indicators
-                const subSubIndicators = subIndicatorOptions[subInd.value] || [];
-                if (subSubIndicators.some(s => s.value === 'FEMALE')) {
-                  const femaleEntry = formData.employmentFacilitation.find(
-                    entry => entry.program === program &&
-                      entry.indicator === indicator.value &&
-                      entry.sub_indicator === subInd.value &&
-                      entry.sub_sub_indicator === 'FEMALE'
-                  );
-
+              if (mainEntry) {
+                if (isFemaleSubIndicator) {
+                  // Store in female fields, not total fields
                   processedEntries.push({
-                    program,
+                    program: programValue,
                     indicator: indicator.value,
                     sub_indicator: subInd.value,
-                    sub_sub_indicator: 'FEMALE',
-                    previous_report_period: femaleEntry?.previous_female_count || 0,
-                    current_period: femaleEntry?.current_female_count || 0,
-                    remarks: femaleEntry?.remarks || null
+                    sub_sub_indicator: "",
+                    previous_report_period: 0,
+                    current_period: 0,
+                    previous_female_count: mainEntry.previous_female_count || 0,
+                    current_female_count: mainEntry.current_female_count || 0,
+                    remarks: mainEntry.remarks || ""
+                  });
+                } else {
+                  processedEntries.push({
+                    program: programValue,
+                    indicator: indicator.value,
+                    sub_indicator: subInd.value,
+                    sub_sub_indicator: "",
+                    previous_report_period: mainEntry.previous_report_period,
+                    current_period: mainEntry.current_period,
+                    previous_female_count: null,
+                    current_female_count: null,
+                    remarks: mainEntry.remarks || ""
                   });
                 }
               }
             });
           } else {
-            // No sub-indicators, just add the main indicator entry
             const mainEntry = formData.employmentFacilitation.find(
-              entry => entry.program === program &&
+              entry => entry.program === programValue &&
                 entry.indicator === indicator.value &&
-                !entry.sub_indicator
+                (!entry.sub_indicator || entry.sub_indicator === "")
             );
 
-            processedEntries.push({
-              program,
-              indicator: indicator.value,
-              sub_indicator: null,
-              sub_sub_indicator: null,
-              previous_report_period: mainEntry?.previous_report_period || 0,
-              current_period: mainEntry?.current_period || 0,
-              remarks: mainEntry?.remarks || null
-            });
+            if (mainEntry) {
+              processedEntries.push({
+                program: programValue,
+                indicator: indicator.value,
+                sub_indicator: null,
+                sub_sub_indicator: null,
+                previous_report_period: mainEntry.previous_report_period,
+                current_period: mainEntry.current_period,
+                previous_female_count: null,
+                current_female_count: null,
+                remarks: mainEntry.remarks || ""
+              });
+            }
           }
         });
       });
-
-      console.log('Form data state:', formData);
-      console.log('Final processed entries:', processedEntries);
 
       // Call the report service to create the report
       const result = await reportService.createReport(
@@ -262,7 +437,6 @@ export default function ReportPage() {
       );
 
       if (result) {
-        console.log('Submitted result:', result);
         setSubmitSuccess(true);
         toast.success('Report submitted successfully!');
         // Reset form after successful submission
@@ -279,529 +453,6 @@ export default function ReportPage() {
       setLoading(false);
       setIsSubmitting(false);
     }
-  };
-
-  const generateEntriesForProgram = (program: ProgramType): EmploymentFacilitationRow[] => {
-    const entries: EmploymentFacilitationRow[] = [];
-
-    // Get all indicators for the program
-    const indicators = indicatorOptions[program] || [];
-
-    indicators.forEach(indicator => {
-      const subIndicators = subIndicatorOptions[indicator.value] || [];
-
-      if (subIndicators.length > 0) {
-        // Has sub-indicators
-        subIndicators.forEach(subInd => {
-          const subSubIndicators = subIndicatorOptions[subInd.value] || [];
-
-          if (subSubIndicators.length > 0) {
-            // Has sub-sub-indicators
-            subSubIndicators.forEach(subSubInd => {
-              entries.push({
-                program,
-                indicator: indicator.value,
-                sub_indicator: subInd.value,
-                sub_sub_indicator: subSubInd.value,
-                previous_report_period: 0,
-                current_period: 0,
-                remarks: ""
-              });
-            });
-          } else {
-            // No sub-sub-indicators
-            entries.push({
-              program,
-              indicator: indicator.value,
-              sub_indicator: subInd.value,
-              sub_sub_indicator: "",
-              previous_report_period: 0,
-              current_period: 0,
-              remarks: ""
-            });
-          }
-        });
-      } else {
-        // No sub-indicators
-        entries.push({
-          program,
-          indicator: indicator.value,
-          sub_indicator: "",
-          sub_sub_indicator: "",
-          previous_report_period: 0,
-          current_period: 0,
-          remarks: ""
-        });
-      }
-    });
-
-    return entries;
-  };
-
-  const updateRow = <K extends keyof EmploymentFacilitationRow>(
-    index: number,
-    field: K,
-    value: FieldType<EmploymentFacilitationRow, K>
-  ) => {
-    const newData = { ...formData };
-
-    if (field === "program") {
-      // If selecting a program, generate all its entries
-      if (value) {
-        const programValue = value as ProgramType;
-        const entries = generateEntriesForProgram(programValue);
-
-        // Replace the current row with all generated entries
-        newData.employmentFacilitation = [
-          ...newData.employmentFacilitation.slice(0, index),
-          ...entries,
-          ...newData.employmentFacilitation.slice(index + 1)
-        ];
-      } else {
-        // If clearing program, just update the single row
-        newData.employmentFacilitation[index] = {
-          program: value as ProgramType,
-          indicator: "",
-          sub_indicator: "",
-          sub_sub_indicator: "",
-          previous_report_period: 0,
-          current_period: 0,
-          remarks: ""
-        };
-      }
-    } else {
-      // For other fields, just update the value
-      newData.employmentFacilitation[index][field] = value;
-    }
-
-    setFormData(newData);
-  };
-
-  // Program options based on the DOLE form
-  const programOptions = [
-    { value: "JOB_VACANCIES", label: "1. Job vacancies solicited/reported" },
-    { value: "APPLICANTS_REGISTERED", label: "2. Applicants registered" },
-    { value: "APPLICANTS_REFERRED", label: "3. Applicants referred" },
-    { value: "APPLICANTS_PLACED", label: "4. Applicants placed" },
-    { value: "PWD_PROJECTS", label: "5. Number of projects implemented for PWDs" },
-    { value: "PWD_TRAINING", label: "6. Training conducted for PWDs" },
-    { value: "APPLICANTS_COUNSELLED", label: "7. Total applicants counselled" },
-    { value: "APPLICANTS_TESTED", label: "8. Total applicants tested" },
-    { value: "CAREER_GUIDANCE", label: "9. Career Guidance conducted" },
-    { value: "JOB_FAIR", label: "10. Jobs fair" },
-    { value: "LIVELIHOOD", label: "11. Livelihood and self-employment" }
-  ];
-
-  // Indicator options based on the DOLE form
-  const indicatorOptions: IndicatorOptionsMap = {
-    JOB_VACANCIES: [
-      { value: "REGULAR_PROGRAM", label: "1.1 Regular Program" },
-      { value: "SPES", label: "1.2 SPES" },
-      { value: "WAP", label: "1.3 WAP (Work Appreciation Program)" },
-      { value: "TULAY", label: "1.4 TULAY" }
-    ],
-    APPLICANTS_REGISTERED: [
-      { value: "REGULAR_PROGRAM", label: "2.1 Regular program" },
-      { value: "SPES", label: "2.2 SPES" },
-      { value: "WAP", label: "2.3 WAP" },
-      { value: "TULAY", label: "2.4 TULAY 2000" },
-      { value: "RETRENCHED", label: "2.5 Retrenched/Displaced Workers" },
-      { value: "OFWS", label: "2.6 Returning OFWs" },
-      { value: "MIGRATORY", label: "2.7 Migratory Workers" },
-      { value: "RURAL", label: "2.8 Rural Workers" }
-    ],
-    APPLICANTS_REFERRED: [
-      { value: "REGULAR_PROGRAM_REFERRED", label: "3.1 Regular Program" },
-      { value: "SPES_REFERRED", label: "3.2 SPES" },
-      { value: "WAP_REFERRED", label: "3.3 WAP" },
-      { value: "TULAY_REFERRED", label: "3.4 TULAY 2000" },
-      { value: "RETRENCHED_REFERRED", label: "3.5 Retrenched/Displaced Workers" },
-      { value: "OFWS_REFERRED", label: "3.6 Returning OFWs" },
-      { value: "MIGRATORY_REFERRED", label: "3.7 Migratory Workers" },
-      { value: "RURAL_REFERRED", label: "3.8 Rural Workers" }
-    ],
-    APPLICANTS_PLACED: [
-      { value: "REGULAR_PROGRAM_PLACED", label: "4.1 Regular Program" },
-      { value: "SPES_PLACED", label: "4.2 SPES" },
-      { value: "WAP_PLACED", label: "4.3 WAP" },
-      { value: "TULAY_PLACED", label: "4.4 TULAY 2000" },
-      { value: "RETRENCHED_PLACED", label: "4.5 Retrenched/Displaced Workers" },
-      { value: "OFWS_PLACED", label: "4.6 Returning OFWs" },
-      { value: "MIGRATORY_PLACED", label: "4.7 Migratory Workers" },
-      { value: "RURAL_PLACED", label: "4.8 Rural Workers" }
-    ],
-    PWD_PROJECTS: [
-      { value: "BENEFICIARIES_PWD", label: "5.1 Beneficiaries" }
-    ],
-    PWD_TRAINING: [
-      { value: "BENEFICIARIES_TRAINING", label: "6.1 Beneficiaries" }
-    ],
-    APPLICANTS_COUNSELLED: [
-      { value: "TOTAL_COUNSELLED", label: "7. Total applicants counselled" }
-    ],
-    APPLICANTS_TESTED: [
-      { value: "TOTAL_TESTED", label: "8. Total applicants tested" }
-    ],
-    CAREER_GUIDANCE: [
-      { value: "STUDENTS", label: "9.1 Students given Career Guidance" },
-      { value: "INSTITUTIONS", label: "9.2 Schools/Colleges/Universities" }
-    ],
-    JOB_FAIR: [
-      { value: "JOBS_FAIR_CONDUCTED", label: "10.1 Jobs fair conducted/assisted" },
-      { value: "JOBS_FAIR_TYPES", label: "10.2 Types" },
-      { value: "JOB_VACANCIES_FAIR", label: "10.3 Job vacancies solicited" },
-      { value: "JOB_APPLICANTS_FAIR", label: "10.4 Job applicants registered" },
-      { value: "HIRED_ON_SPOT", label: "10.5 Job applicants hired on the spot" },
-      { value: "REPORTED_PLACED", label: "10.6 Job applicants reported placed" },
-      { value: "PRAS_ASSISTED", label: "10.7 PRAS assisted" },
-      { value: "LRA", label: "10.8 Local Recruitment Activity (LRA)" }
-    ],
-    LIVELIHOOD: [
-      { value: "BAZAARS", label: "11. Livelihood and self-employment bazaars conducted" }
-    ]
-  };
-
-  // Sub-indicator options
-  const subIndicatorOptions: IndicatorOptionsMap = {
-    REGULAR_PROGRAM: [
-      { value: "LOCAL_EMPLOYMENT", label: "1.1.1 Local employment" },
-      { value: "OVERSEAS_EMPLOYMENT", label: "1.1.2 Overseas employment" }
-    ],
-    REGULAR_PROGRAM_REFERRED: [
-      { value: "LOCAL_EMPLOYMENT_REFERRED", label: "3.1.1 Local Employment" },
-      { value: "OVERSEAS_EMPLOYMENT_REFERRED", label: "3.1.2 Overseas employment" },
-      { value: "SELF_EMPLOYMENT_REFERRED", label: "3.1.3 Self-employment" },
-      { value: "TRAINING_REFERRED", label: "3.1.4 Training" }
-    ],
-    SPES: [
-      { value: "PUBLIC_SECTOR", label: "1.2.1 Public Sector" },
-      { value: "PRIVATE_SECTOR", label: "1.2.2 Private Sector" }
-    ],
-    SPES_REFERRED: [
-      { value: "FEMALE", label: "3.2.1 Female" }
-    ],
-    WAP: [
-      { value: "FEMALE", label: "1.3.1 Female" }
-    ],
-    WAP_REFERRED: [
-      { value: "FEMALE", label: "3.3.1 Female" }
-    ],
-    TULAY: [
-      { value: "WAGE_EMPLOYMENT", label: "1.4.1 Wage employment" },
-      { value: "SELF_EMPLOYMENT", label: "1.4.2 Self-employment" }
-    ],
-    TULAY_REFERRED: [
-      { value: "WAGE_EMPLOYMENT_REFERRED", label: "3.4.1 Wage employment" },
-      { value: "SELF_EMPLOYMENT_TULAY_REFERRED", label: "3.4.2 Self-employment" }
-    ],
-    // For Applicants Registered section
-    REGULAR_PROGRAM_APPLICANTS: [
-      { value: "FEMALE", label: "2.1.1 Female" }
-    ],
-    SPES_APPLICANTS: [
-      { value: "FEMALE", label: "2.2.1 Female" }
-    ],
-    WAP_APPLICANTS: [
-      { value: "FEMALE", label: "2.3.1 Female" }
-    ],
-    TULAY_APPLICANTS: [
-      { value: "WAGE_EMPLOYMENT", label: "2.4.1 Wage employment" },
-      { value: "SELF_EMPLOYMENT", label: "2.4.2 Self-employment" }
-    ],
-    RETRENCHED: [
-      { value: "FEMALE", label: "2.5.1 Female" }
-    ],
-    OFWS: [
-      { value: "FEMALE", label: "2.6.1 Female" }
-    ],
-    MIGRATORY: [
-      { value: "FEMALE", label: "2.7.1 Female" }
-    ],
-    RURAL: [
-      { value: "FEMALE", label: "2.8.1 Female" }
-    ],
-    BENEFICIARIES_PWD: [
-      { value: "FEMALE", label: "5.1.1 Female" }
-    ],
-    PWD_TRAINING_BENEFICIARIES: [
-      { value: "FEMALE", label: "6.1.1 Female" }
-    ],
-    JOBS_FAIR_CONDUCTED: [
-      { value: "LGU", label: "10.1.1 Local Government Units" },
-      { value: "PRIVATE", label: "10.1.2 Private Institutions" },
-      { value: "SCHOOLS", label: "10.1.3 Schools" }
-    ],
-    JOBS_FAIR_TYPES: [
-      { value: "LOCAL", label: "10.2.1 Local employment" },
-      { value: "OVERSEAS", label: "10.2.2 Overseas employment" },
-      { value: "BOTH", label: "10.2.3 Local and Overseas employment" },
-      { value: "PWD", label: "10.2.4 PWDs and other disadvantaged groups" }
-    ],
-    JOB_VACANCIES_FAIR: [
-      { value: "LOCAL", label: "10.3.1 Local employment" },
-      { value: "OVERSEAS", label: "10.3.2 Overseas employment" },
-      { value: "BOTH", label: "10.3.3 Local and Overseas employment" },
-      { value: "PWD", label: "10.3.4 PWDs and other disadvantaged groups" }
-    ],
-    JOB_APPLICANTS_FAIR: [
-      { value: "LOCAL_APPLICANTS", label: "10.4.1 Local employment" },
-      { value: "OVERSEAS_APPLICANTS", label: "10.4.2 Overseas employment" },
-      { value: "BOTH_APPLICANTS", label: "10.4.3 Local and Overseas employment" },
-      { value: "PWD_APPLICANTS", label: "10.4.4 PWDs and other disadvantaged groups" }
-    ],
-    HIRED_ON_SPOT: [
-      { value: "LOCAL_HIRED", label: "10.5.1 Local employment" },
-      { value: "OVERSEAS_HIRED", label: "10.5.2 Overseas employment" },
-      { value: "BOTH_HIRED", label: "10.5.3 Local and Overseas employment" },
-      { value: "PWD_HIRED", label: "10.5.4 PWDs and other disadvantaged groups" }
-    ],
-    REPORTED_PLACED: [
-      { value: "LOCAL_PLACED", label: "10.6.1 Local employment" },
-      { value: "OVERSEAS_PLACED", label: "10.6.2 Overseas employment" },
-      { value: "BOTH_PLACED", label: "10.6.3 Local and Overseas employment" },
-      { value: "PWD_PLACED", label: "10.6.4 PWDs and other disadvantaged groups" }
-    ],
-    PRAS_ASSISTED: [
-      { value: "PRAS_REGISTERED", label: "10.7.1 Job applicants registered" },
-      { value: "PRAS_PLACED", label: "10.7.2 Job applicants placed" }
-    ],
-    LRA: [
-      { value: "LRA_ASSISTED", label: "10.8.1 LRA assisted" },
-      { value: "LRA_VACANCIES", label: "10.8.2 Job vacancies solicited" },
-      { value: "LRA_APPLICANTS", label: "10.8.3 Job applicants registered" },
-      { value: "LRA_HIRED", label: "10.8.4 Job applicants hired on the spot" },
-      { value: "LRA_PLACED", label: "10.8.5 Job applicants reported placed" }
-    ],
-    LRA_ASSISTED: [
-      { value: "LRA_LGU", label: "10.8.1.1 Local Government Units" },
-      { value: "LRA_PRIVATE", label: "10.8.2.1 Private Institutions" },
-      { value: "LRA_SCHOOLS", label: "10.8.3.1 Schools" }
-    ],
-    LRA_APPLICANTS: [
-      { value: "FEMALE", label: "10.8.3.1 Female" }
-    ],
-    LRA_HIRED: [
-      { value: "FEMALE", label: "10.8.4.1 Female" }
-    ],
-    LRA_PLACED: [
-      { value: "FEMALE", label: "10.8.5.1 Female" }
-    ],
-    RETRENCHED_REFERRED: [
-      { value: "FEMALE", label: "3.5.1 Female" }
-    ],
-    OFWS_REFERRED: [
-      { value: "FEMALE", label: "3.6.1 Female" }
-    ],
-    MIGRATORY_REFERRED: [
-      { value: "FEMALE", label: "3.7.1 Female" }
-    ],
-    RURAL_REFERRED: [
-      { value: "FEMALE", label: "3.8.1 Female" }
-    ],
-    LOCAL_EMPLOYMENT_REFERRED: [
-      { value: "FEMALE", label: "3.1.1.1 Female" }
-    ],
-    OVERSEAS_EMPLOYMENT_REFERRED: [
-      { value: "FEMALE", label: "3.1.2.1 Female" }
-    ],
-    SELF_EMPLOYMENT_REFERRED: [
-      { value: "FEMALE", label: "3.1.3.1 Female" }
-    ],
-    TRAINING_REFERRED: [
-      { value: "FEMALE", label: "3.1.4.1 Female" }
-    ],
-    WAGE_EMPLOYMENT_REFERRED: [
-      { value: "FEMALE", label: "3.4.1.1 Female" }
-    ],
-    SELF_EMPLOYMENT_TULAY_REFERRED: [
-      { value: "FEMALE", label: "3.4.2.1 Female" }
-    ],
-    REGULAR_PROGRAM_PLACED: [
-      { value: "LOCAL_EMPLOYMENT_PLACED", label: "4.1.1 Local Employment" },
-      { value: "OVERSEAS_EMPLOYMENT_PLACED", label: "4.1.2 Overseas employment" },
-      { value: "SELF_EMPLOYMENT_PLACED", label: "4.1.3 Self-employment" },
-      { value: "TRAINING_PLACED", label: "4.1.4 Training" }
-    ],
-    SPES_PLACED: [
-      { value: "PUBLIC_SECTOR_PLACED", label: "4.2.1 Public Sector" },
-      { value: "PRIVATE_SECTOR_PLACED", label: "4.2.2 Private Sector" }
-    ],
-    WAP_PLACED: [
-      { value: "FEMALE", label: "4.3.1 Female" }
-    ],
-    TULAY_PLACED: [
-      { value: "WAGE_EMPLOYMENT_PLACED", label: "4.4.1 Wage employment" },
-      { value: "SELF_EMPLOYMENT_TULAY_PLACED", label: "4.4.2 Self-employment" }
-    ],
-    RETRENCHED_PLACED: [
-      { value: "FEMALE", label: "4.5.1 Female" }
-    ],
-    OFWS_PLACED: [
-      { value: "FEMALE", label: "4.6.1 Female" }
-    ],
-    MIGRATORY_PLACED: [
-      { value: "FEMALE", label: "4.7.1 Female" }
-    ],
-    RURAL_PLACED: [
-      { value: "FEMALE", label: "4.8.1 Female" }
-    ],
-    LOCAL_EMPLOYMENT_PLACED: [
-      { value: "FEMALE", label: "4.1.1.1 Female" }
-    ],
-    OVERSEAS_EMPLOYMENT_PLACED: [
-      { value: "FEMALE", label: "4.1.2.1 Female" }
-    ],
-    SELF_EMPLOYMENT_PLACED: [
-      { value: "FEMALE", label: "4.1.3.1 Female" }
-    ],
-    TRAINING_PLACED: [
-      { value: "FEMALE", label: "4.1.4.1 Female" }
-    ],
-    PUBLIC_SECTOR_PLACED: [
-      { value: "FEMALE", label: "4.2.1.1 Female" }
-    ],
-    PRIVATE_SECTOR_PLACED: [
-      { value: "FEMALE", label: "4.2.2.1 Female" }
-    ],
-    WAGE_EMPLOYMENT_PLACED: [
-      { value: "FEMALE", label: "4.4.1.1 Female" }
-    ],
-    SELF_EMPLOYMENT_TULAY_PLACED: [
-      { value: "FEMALE", label: "4.4.2.1 Female" }
-    ],
-    // Sub-sub indicators for Local Employment under Regular Program
-    LOCAL_EMPLOYMENT: [
-      { value: "FEMALE", label: "1.1.1.1 Female" }
-    ],
-    // Sub-sub indicators for Overseas Employment under Regular Program
-    OVERSEAS_EMPLOYMENT: [
-      { value: "FEMALE", label: "1.1.2.1 Female" }
-    ],
-    // Sub-sub indicators for Public Sector under SPES
-    PUBLIC_SECTOR: [
-      { value: "FEMALE", label: "1.2.1.1 Female" }
-    ],
-    // Sub-sub indicators for Private Sector under SPES
-    PRIVATE_SECTOR: [
-      { value: "FEMALE", label: "1.2.2.1 Female" }
-    ],
-    // Sub-sub indicators for Wage Employment under TULAY
-    WAGE_EMPLOYMENT: [
-      { value: "FEMALE", label: "1.4.1.1 Female" }
-    ],
-    // Sub-sub indicators for Self Employment under TULAY
-    SELF_EMPLOYMENT: [
-      { value: "FEMALE", label: "1.4.2.1 Female" }
-    ],
-    // Applicants Registered (2) - Other Categories
-    RETRENCHED_APPLICANTS: [
-      { value: "FEMALE", label: "2.5.1 Female" }
-    ],
-    OFWS_APPLICANTS: [
-      { value: "FEMALE", label: "2.6.1 Female" }
-    ],
-    MIGRATORY_APPLICANTS: [
-      { value: "FEMALE", label: "2.7.1 Female" }
-    ],
-    RURAL_APPLICANTS: [
-      { value: "FEMALE", label: "2.8.1 Female" }
-    ],
-    // Sub-sub indicators for TULAY 2000 Wage Employment
-    WAGE_EMPLOYMENT_APPLICANTS: [
-      { value: "FEMALE", label: "2.4.1.1 Female" }
-    ],
-    // Sub-sub indicators for TULAY 2000 Self Employment
-    SELF_EMPLOYMENT_APPLICANTS: [
-      { value: "FEMALE", label: "2.4.2.1 Female" }
-    ],
-    // PWD Training (6)
-    BENEFICIARIES_TRAINING: [
-      { value: "FEMALE", label: "6.1.1 Female" }
-    ],
-    // Sub-sub indicators for Job Fair Applicants
-    LOCAL_APPLICANTS: [
-      { value: "FEMALE", label: "10.4.1.1 Female" }
-    ],
-    OVERSEAS_APPLICANTS: [
-      { value: "FEMALE", label: "10.4.2.1 Female" }
-    ],
-    BOTH_APPLICANTS: [
-      { value: "FEMALE", label: "10.4.3.1 Female" }
-    ],
-    PWD_APPLICANTS: [
-      { value: "FEMALE", label: "10.4.4.1 Female" }
-    ],
-    // Sub-sub indicators for Hired on Spot
-    LOCAL_HIRED: [
-      { value: "FEMALE", label: "10.5.1.1 Female" }
-    ],
-    OVERSEAS_HIRED: [
-      { value: "FEMALE", label: "10.5.2.1 Female" }
-    ],
-    BOTH_HIRED: [
-      { value: "FEMALE", label: "10.5.3.1 Female" }
-    ],
-    PWD_HIRED: [
-      { value: "FEMALE", label: "10.5.4.1 Female" }
-    ],
-    // Sub-sub indicators for Reported Placed
-    LOCAL_PLACED: [
-      { value: "FEMALE", label: "10.6.1.1 Female" }
-    ],
-    OVERSEAS_PLACED: [
-      { value: "FEMALE", label: "10.6.2.1 Female" }
-    ],
-    BOTH_PLACED: [
-      { value: "FEMALE", label: "10.6.3.1 Female" }
-    ],
-    PWD_PLACED: [
-      { value: "FEMALE", label: "10.6.4.1 Female" }
-    ],
-    // Sub-sub indicators for PRAS
-    PRAS_REGISTERED: [
-      { value: "FEMALE", label: "10.7.1.1 Female" }
-    ],
-    PRAS_PLACED: [
-      { value: "FEMALE", label: "10.7.2.1 Female" }
-    ],
-    // Sub-indicators for LRA Assisted
-    LRA_LGU: [
-      { value: "FEMALE", label: "10.8.1.1 Female" }
-    ],
-    LRA_PRIVATE: [
-      { value: "FEMALE", label: "10.8.2.1 Female" }
-    ],
-    LRA_SCHOOLS: [
-      { value: "FEMALE", label: "10.8.3.1 Female" }
-    ],
-    LRA_VACANCIES: [
-      { value: "FEMALE", label: "10.8.2.1 Female" }
-    ]
-  };
-
-  const addNewRow = () => {
-    setFormData(prev => ({
-      ...prev,
-      employmentFacilitation: [
-        ...prev.employmentFacilitation,
-        {
-          program: "" as ProgramType,
-          indicator: "",
-          sub_indicator: "",
-          sub_sub_indicator: "",
-          previous_report_period: 0,
-          current_period: 0,
-          remarks: ""
-        }
-      ]
-    }));
-  };
-
-  const removeRow = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      employmentFacilitation: prev.employmentFacilitation.filter((_, i) => i !== index)
-    }));
   };
 
   const updateIndicatorValue = (
@@ -850,13 +501,13 @@ export default function ReportPage() {
   ) => {
     setFormData(prev => {
       const newData = { ...prev };
+      const isFemale = subIndicator.includes('FEMALE');
       const existingIndex = newData.employmentFacilitation.findIndex(
         row => row.program === program &&
           row.indicator === indicator &&
           row.sub_indicator === subIndicator &&
-          !row.sub_sub_indicator
+          row.sub_sub_indicator === ""
       );
-
       if (existingIndex === -1) {
         // Add new entry
         const newRow: EmploymentFacilitationRow = {
@@ -866,18 +517,30 @@ export default function ReportPage() {
           sub_sub_indicator: "",
           previous_report_period: 0,
           current_period: 0,
+          previous_female_count: 0,
+          current_female_count: 0,
           remarks: ""
         };
+        if (isFemale) {
+          newRow[field === 'previous_report_period' ? 'previous_female_count' : 'current_female_count'] = value;
+        } else {
+          newRow[field] = value;
+        }
         newData.employmentFacilitation.push(newRow);
-        newData.employmentFacilitation[newData.employmentFacilitation.length - 1][field] = value;
       } else {
         // Update existing entry
-        newData.employmentFacilitation[existingIndex] = {
-          ...newData.employmentFacilitation[existingIndex],
-          [field]: value
-        };
+        if (isFemale) {
+          newData.employmentFacilitation[existingIndex] = {
+            ...newData.employmentFacilitation[existingIndex],
+            [field === 'previous_report_period' ? 'previous_female_count' : 'current_female_count']: value
+          };
+        } else {
+          newData.employmentFacilitation[existingIndex] = {
+            ...newData.employmentFacilitation[existingIndex],
+            [field]: value
+          };
+        }
       }
-
       return newData;
     });
   };
@@ -892,13 +555,13 @@ export default function ReportPage() {
   ) => {
     setFormData(prev => {
       const newData = { ...prev };
+      const isFemale = subSubIndicator.includes('FEMALE');
       const existingIndex = newData.employmentFacilitation.findIndex(
         row => row.program === program &&
           row.indicator === indicator &&
           row.sub_indicator === subIndicator &&
           row.sub_sub_indicator === subSubIndicator
       );
-
       if (existingIndex === -1) {
         // Add new entry
         const newRow: EmploymentFacilitationRow = {
@@ -912,19 +575,66 @@ export default function ReportPage() {
           current_female_count: 0,
           remarks: ""
         };
+        if (isFemale) {
+          newRow[field] = value;
+        } else {
+          newRow[field === 'previous_female_count' ? 'previous_report_period' : 'current_period'] = value;
+        }
         newData.employmentFacilitation.push(newRow);
-        newData.employmentFacilitation[newData.employmentFacilitation.length - 1][field] = value;
       } else {
         // Update existing entry
-        newData.employmentFacilitation[existingIndex] = {
-          ...newData.employmentFacilitation[existingIndex],
-          [field]: value
-        };
+        if (isFemale) {
+          newData.employmentFacilitation[existingIndex] = {
+            ...newData.employmentFacilitation[existingIndex],
+            [field]: value
+          };
+        } else {
+          newData.employmentFacilitation[existingIndex] = {
+            ...newData.employmentFacilitation[existingIndex],
+            [field === 'previous_female_count' ? 'previous_report_period' : 'current_period']: value
+          };
+        }
       }
-
       return newData;
     });
   };
+
+  // Utility to fill all fields with sample data
+  function fillAllFieldsWithSampleData() {
+    const allRows = generateAllEmploymentRows();
+    if (typeof window !== 'undefined') {
+      console.group('fillAllFieldsWithSampleData: rows to fill');
+      console.table(allRows.map(r => ({
+        program: r.program,
+        indicator: r.indicator,
+        sub_indicator: r.sub_indicator,
+        sub_sub_indicator: r.sub_sub_indicator
+      })));
+      console.groupEnd();
+    }
+    setFormData(prev => ({
+      ...prev,
+      employmentFacilitation: allRows.map(row => {
+        if ((row.sub_indicator && row.sub_indicator.includes('FEMALE')) || (row.sub_sub_indicator && row.sub_sub_indicator.includes('FEMALE'))) {
+          return {
+            ...row,
+            previous_report_period: 0,
+            current_period: 0,
+            previous_female_count: 5,
+            current_female_count: 10
+          };
+        } else {
+          return {
+            ...row,
+            previous_report_period: 10,
+            current_period: 20,
+            previous_female_count: 0,
+            current_female_count: 0
+          };
+        }
+      })
+    }));
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-8">
@@ -1043,6 +753,13 @@ export default function ReportPage() {
                     </svg>
                     Navigate to Indicators
                   </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickAddModal(true)}
+                    className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                  >
+                    12 Available Jobs
+                  </button>
                 </div>
 
                 {/* Program Navigation Links */}
@@ -1066,12 +783,62 @@ export default function ReportPage() {
                     </button>
                   ))}
                 </div>
+                {/* Quick Add Data Summary */}
+                {quickAddData && (
+                  <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-blue-700 mb-2">Quick Add Summary</h4>
+                    <div className="mb-2">
+                      <span className="font-medium">Top Jobs:</span>
+                      <ul className="list-disc ml-6 text-sm">
+                        {quickAddData.topJobs.map((job, idx) => (
+                          <li key={idx}>{job.position} (Vacancies: {job.vacancies}, Qualified: {job.qualified})</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="mb-2">
+                      <span className="font-medium">Education:</span>
+                      <span className="ml-2 text-sm">Elementary: {quickAddData.education.elementary}, Secondary: {quickAddData.education.secondary}, College: {quickAddData.education.college}, Graduate: {quickAddData.education.graduate}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Sectors:</span>
+                      <span className="ml-2 text-sm">Government: {quickAddData.sectors.government}, Private: {quickAddData.sectors.private}, Overseas: {quickAddData.sectors.overseas}</span>
+                    </div>
+                  </div>
+                )}
               </div>
+            </div>
+
+            {/* Quick Fill Button for Testing */}
+            <div className="flex justify-end mb-4 gap-2">
+              <button
+                type="button"
+                onClick={fillAllFieldsWithSampleData}
+                className="px-4 py-2 bg-amber-100 text-amber-800 border border-amber-300 rounded-lg hover:bg-amber-200 transition font-medium text-sm shadow-sm"
+              >
+                Fill All Fields with Sample Data
+              </button>
+              <button
+                type="button"
+                onClick={() => { if (typeof window !== 'undefined') { console.log('formData.employmentFacilitation', formData.employmentFacilitation); } }}
+                className="px-4 py-2 bg-gray-100 text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-200 transition font-medium text-sm shadow-sm"
+              >
+                Debug: Log Current Form Data
+              </button>
             </div>
 
             {/* Table Section with Enhanced Styling */}
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-blue-100 text-gray-900">
+                    <th className="px-6 py-3 text-left font-bold border-b border-blue-200 align-bottom" style={{ minWidth: 260 }}>
+                      INDICATOR <span className="block text-xs font-normal text-gray-600">(OUTPUT SPECIFICATION)</span>
+                    </th>
+                    <th className="px-3 py-3 text-center font-bold border-b border-blue-200">PREVIOUS REPORTING PERIOD</th>
+                    <th className="px-3 py-3 text-center font-bold border-b border-blue-200">CURRENT REPORTING PERIOD</th>
+                    <th className="px-3 py-3 border-b border-blue-200"></th>
+                  </tr>
+                </thead>
                 <tbody className="divide-y divide-gray-100">
                   {programOptions.map((program) => {
                     const indicators = indicatorOptions[program.value] || [];
@@ -1087,7 +854,7 @@ export default function ReportPage() {
                               <span>{program.label.split('.')[1]}</span>
                             </div>
                           </td>
-                          <td colSpan={4}></td>
+                          <td colSpan={2}></td>
                           <td className="px-6 py-4">
                             <button
                               type="button"
@@ -1107,24 +874,31 @@ export default function ReportPage() {
                             </button>
                           </td>
                         </tr>
-
                         {/* Indicators */}
                         {indicators.map((indicator) => {
-                          const subIndicators = subIndicatorOptions[indicator.value] || [];
+                          let subIndicators = subIndicatorOptions[indicator.value] || [];
+                          // Patch: For APPLICANTS_REGISTERED, use the correct subIndicatorOptions key
+                          if (program.value === 'APPLICANTS_REGISTERED') {
+                            const correctKey = getApplicantsRegisteredSubIndicatorKey(indicator.value);
+                            subIndicators = subIndicatorOptions[correctKey] || [];
+                          }
+                          const indicatorLabel = indicatorOptions[program.value]?.find(opt => opt.value === indicator.value)?.label || indicator.label;
                           const indicatorRow = formData.employmentFacilitation.find(
                             row => row.program === program.value && row.indicator === indicator.value && !row.sub_indicator
                           );
-
+                          // Special categories for female row
+                          const isSpecialCategory = ['RETRENCHED', 'OFWS', 'MIGRATORY', 'RURAL'].includes(indicator.value);
                           return (
                             <React.Fragment key={indicator.value}>
-                              {/* Indicator Row */}
+                              {/* Main indicator row (total) */}
                               <tr className="hover:bg-gray-50/50 transition-colors">
                                 <td className="px-6 py-3 pl-16 text-gray-900">
                                   <div className="flex items-center space-x-2">
                                     <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-                                    <span>{indicator.label}</span>
+                                    <span>{indicatorLabel}</span>
                                   </div>
                                 </td>
+                                {/* Previous period input */}
                                 <td className="px-3 py-2">
                                   <input
                                     type="number"
@@ -1137,7 +911,7 @@ export default function ReportPage() {
                                     }}
                                   />
                                 </td>
-                                <td className="px-3 py-2"></td>
+                                {/* Current period input */}
                                 <td className="px-3 py-2">
                                   <input
                                     type="number"
@@ -1150,57 +924,97 @@ export default function ReportPage() {
                                     }}
                                   />
                                 </td>
-                                <td className="px-3 py-2"></td>
                                 <td></td>
                               </tr>
-
+                              {/* Special Category Female Row */}
+                              {isSpecialCategory && (
+                                <tr className="hover:bg-gray-50/50 transition-colors">
+                                  <td className="px-6 py-3 pl-24 text-gray-800">
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-1 h-1 bg-pink-300 rounded-full"></div>
+                                      <span className="flex items-center space-x-1">
+                                        <span>{(subIndicatorOptions[indicator.value]?.[0]?.label) || (indicator.label + ' Female')}</span>
+                                        <svg className="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                      </span>
+                                    </div>
+                                  </td>
+                                  {/* Previous period input (female) */}
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      className="w-full px-3 py-2 rounded-lg border border-pink-200 text-center focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors bg-pink-50/30"
+                                      value={(
+                                        formData.employmentFacilitation.find(row =>
+                                          row.program === program.value &&
+                                          row.indicator === indicator.value &&
+                                          row.sub_indicator === '' &&
+                                          row.sub_sub_indicator === 'FEMALE')?.previous_female_count || 0
+                                      )}
+                                      onChange={e => updateSubSubIndicatorValue(
+                                        program.value,
+                                        indicator.value,
+                                        '',
+                                        'FEMALE',
+                                        'previous_female_count',
+                                        parseInt(e.target.value) || 0
+                                      )}
+                                    />
+                                  </td>
+                                  {/* Current period input (female) */}
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      className="w-full px-3 py-2 rounded-lg border border-pink-200 text-center focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors bg-pink-50/30"
+                                      value={(
+                                        formData.employmentFacilitation.find(row =>
+                                          row.program === program.value &&
+                                          row.indicator === indicator.value &&
+                                          row.sub_indicator === '' &&
+                                          row.sub_sub_indicator === 'FEMALE')?.current_female_count || 0
+                                      )}
+                                      onChange={e => updateSubSubIndicatorValue(
+                                        program.value,
+                                        indicator.value,
+                                        '',
+                                        'FEMALE',
+                                        'current_female_count',
+                                        parseInt(e.target.value) || 0
+                                      )}
+                                    />
+                                  </td>
+                                  <td></td>
+                                </tr>
+                              )}
                               {/* Sub-indicators */}
-                              {subIndicators.map((subInd) => {
+                              {!isSpecialCategory && subIndicators.map((subInd) => {
+                                // For 2.x, subInd is e.g. "2.1.1 Local employment"
+                                const subIndicatorLabel = subInd.label;
                                 const subIndicatorRow = formData.employmentFacilitation.find(
                                   row => row.program === program.value &&
                                     row.indicator === indicator.value &&
                                     row.sub_indicator === subInd.value &&
-                                    !row.sub_sub_indicator
+                                    (!row.sub_sub_indicator || row.sub_sub_indicator === "")
                                 );
                                 const subSubIndicators = subIndicatorOptions[subInd.value] || [];
-
-                                // Check if this is a female entry
-                                const isFemaleEntry = subInd.value === "FEMALE" || subInd.label.includes("Female");
-
-                                // Check if this is an LRA entry that should not have female styling
-                                const isLRAEntry = subInd.label.includes("LRA") ||
-                                  subInd.label.includes("Local Government Units") ||
-                                  subInd.label.includes("Private Institutions") ||
-                                  subInd.label.includes("Schools");
-
-                                // Only apply female styling if it's a female entry and not an LRA entry
-                                const shouldApplyFemaleStyling = isFemaleEntry && !isLRAEntry;
-
                                 return (
                                   <React.Fragment key={subInd.value}>
-                                    {/* Sub-indicator Row */}
+                                    {/* Sub-indicator row: always two inputs (total) */}
                                     <tr className="hover:bg-gray-50/50 transition-colors">
                                       <td className="px-6 py-3 pl-24 text-gray-800">
                                         <div className="flex items-center space-x-2">
-                                          <div className={`w-1 h-1 ${shouldApplyFemaleStyling ? 'bg-pink-300' : 'bg-gray-300'} rounded-full`}></div>
-                                          <span className="flex items-center space-x-1">
-                                            <span>{subInd.label}</span>
-                                            {shouldApplyFemaleStyling && (
-                                              <svg className="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                              </svg>
-                                            )}
-                                          </span>
+                                          <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
+                                          <span>{subIndicatorLabel}</span>
                                         </div>
                                       </td>
                                       <td className="px-3 py-2">
                                         <input
                                           type="number"
                                           min="0"
-                                          className={`w-full px-3 py-2 rounded-lg border text-center focus:ring-2 transition-colors ${shouldApplyFemaleStyling
-                                            ? 'border-pink-200 focus:ring-pink-500 focus:border-pink-500 bg-pink-50/30'
-                                            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                                            }`}
+                                          className="w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                                           value={subIndicatorRow?.previous_report_period || 0}
                                           onChange={(e) => {
                                             const newValue = parseInt(e.target.value) || 0;
@@ -1214,15 +1028,11 @@ export default function ReportPage() {
                                           }}
                                         />
                                       </td>
-                                      <td className="px-3 py-2"></td>
                                       <td className="px-3 py-2">
                                         <input
                                           type="number"
                                           min="0"
-                                          className={`w-full px-3 py-2 rounded-lg border text-center focus:ring-2 transition-colors ${shouldApplyFemaleStyling
-                                            ? 'border-pink-200 focus:ring-pink-500 focus:border-pink-500 bg-pink-50/30'
-                                            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                                            }`}
+                                          className="w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                                           value={subIndicatorRow?.current_period || 0}
                                           onChange={(e) => {
                                             const newValue = parseInt(e.target.value) || 0;
@@ -1236,42 +1046,39 @@ export default function ReportPage() {
                                           }}
                                         />
                                       </td>
-                                      <td className="px-3 py-2"></td>
                                       <td></td>
                                     </tr>
-
-                                    {/* Sub-sub-indicators (Female) */}
+                                    {/* Sub-sub-indicator rows (e.g., Female) */}
                                     {subSubIndicators.map((subSubInd) => {
+                                      const isFemale = subSubInd.value.includes("FEMALE");
                                       const subSubIndicatorRow = formData.employmentFacilitation.find(
                                         row => row.program === program.value &&
                                           row.indicator === indicator.value &&
                                           row.sub_indicator === subInd.value &&
                                           row.sub_sub_indicator === subSubInd.value
                                       );
-
                                       return (
                                         <tr key={subSubInd.value} className="hover:bg-gray-50/50 transition-colors">
                                           <td className="px-6 py-3 pl-32 text-gray-700">
                                             <div className="flex items-center space-x-2">
-                                              <div className="w-1 h-1 bg-pink-300 rounded-full"></div>
-                                              <span className="flex items-center space-x-1">
-                                                <span>{subSubInd.label}</span>
+                                              <div className={`w-1 h-1 ${isFemale ? 'bg-pink-300' : 'bg-gray-300'} rounded-full`}></div>
+                                              <span>{subSubInd.label}</span>
+                                              {isFemale && (
                                                 <svg className="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                              </span>
+                                              )}
                                             </div>
                                           </td>
                                           <td className="px-3 py-2">
                                             <input
                                               type="number"
                                               min="0"
-                                              max={subIndicatorRow?.previous_report_period || 0}
-                                              className="w-full px-3 py-2 rounded-lg border border-pink-200 text-center focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors bg-pink-50/30"
-                                              value={subSubIndicatorRow?.previous_female_count || 0}
+                                              className={isFemale ? "w-full px-3 py-2 rounded-lg border border-pink-200 text-center focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors bg-pink-50/30" : "w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"}
+                                              value={isFemale ? (subSubIndicatorRow?.previous_female_count || 0) : (subSubIndicatorRow?.previous_report_period || 0)}
                                               onChange={(e) => {
                                                 const newValue = parseInt(e.target.value) || 0;
-                                                if (newValue <= (subIndicatorRow?.previous_report_period || 0)) {
+                                                if (isFemale) {
                                                   updateSubSubIndicatorValue(
                                                     program.value,
                                                     indicator.value,
@@ -1280,21 +1087,36 @@ export default function ReportPage() {
                                                     "previous_female_count",
                                                     newValue
                                                   );
+                                                } else {
+                                                  setFormData(prev => {
+                                                    const newData = { ...prev };
+                                                    const idx = newData.employmentFacilitation.findIndex(
+                                                      row => row.program === program.value &&
+                                                        row.indicator === indicator.value &&
+                                                        row.sub_indicator === subInd.value &&
+                                                        row.sub_sub_indicator === subSubInd.value
+                                                    );
+                                                    if (idx !== -1) {
+                                                      newData.employmentFacilitation[idx] = {
+                                                        ...newData.employmentFacilitation[idx],
+                                                        previous_report_period: newValue
+                                                      };
+                                                    }
+                                                    return newData;
+                                                  });
                                                 }
                                               }}
                                             />
                                           </td>
-                                          <td className="px-3 py-2"></td>
                                           <td className="px-3 py-2">
                                             <input
                                               type="number"
                                               min="0"
-                                              max={subIndicatorRow?.current_period || 0}
-                                              className="w-full px-3 py-2 rounded-lg border border-pink-200 text-center focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors bg-pink-50/30"
-                                              value={subSubIndicatorRow?.current_female_count || 0}
+                                              className={isFemale ? "w-full px-3 py-2 rounded-lg border border-pink-200 text-center focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors bg-pink-50/30" : "w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"}
+                                              value={isFemale ? (subSubIndicatorRow?.current_female_count || 0) : (subSubIndicatorRow?.current_period || 0)}
                                               onChange={(e) => {
                                                 const newValue = parseInt(e.target.value) || 0;
-                                                if (newValue <= (subIndicatorRow?.current_period || 0)) {
+                                                if (isFemale) {
                                                   updateSubSubIndicatorValue(
                                                     program.value,
                                                     indicator.value,
@@ -1303,11 +1125,27 @@ export default function ReportPage() {
                                                     "current_female_count",
                                                     newValue
                                                   );
+                                                } else {
+                                                  setFormData(prev => {
+                                                    const newData = { ...prev };
+                                                    const idx = newData.employmentFacilitation.findIndex(
+                                                      row => row.program === program.value &&
+                                                        row.indicator === indicator.value &&
+                                                        row.sub_indicator === subInd.value &&
+                                                        row.sub_sub_indicator === subSubInd.value
+                                                    );
+                                                    if (idx !== -1) {
+                                                      newData.employmentFacilitation[idx] = {
+                                                        ...newData.employmentFacilitation[idx],
+                                                        current_period: newValue
+                                                      };
+                                                    }
+                                                    return newData;
+                                                  });
                                                 }
                                               }}
                                             />
                                           </td>
-                                          <td className="px-3 py-2"></td>
                                           <td></td>
                                         </tr>
                                       );
@@ -1363,6 +1201,14 @@ export default function ReportPage() {
             </button>
           </div>
         </form>
+
+        {/* Quick Add Modal Integration */}
+        <QuickAddModal
+          open={showQuickAddModal}
+          onClose={() => setShowQuickAddModal(false)}
+          onSave={data => setQuickAddData(data)}
+          initialData={quickAddData || undefined}
+        />
 
         {/* Validation Errors Popup with Enhanced Styling */}
         {showValidationErrors && Object.keys(validationErrors).length > 0 && (

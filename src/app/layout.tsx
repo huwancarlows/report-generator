@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
 import LayoutClient from "./layout-client";
+import LoadingOverlay from './LoadingOverlay';
 
 // Load fonts
 const geistSans = Geist({
@@ -32,6 +33,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-[#0a0a0a] text-black dark:text-white`}
       >
         <AuthProvider>
+          <LoadingOverlay />
           <LayoutClient>{children}</LayoutClient>
         </AuthProvider>
       </body>

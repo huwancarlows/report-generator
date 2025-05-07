@@ -7,6 +7,13 @@ import { useAuth } from '../context/AuthContext'
 import { exportToPDF } from '@/utils/pdfExport'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../utils/supabaseClient'
+import JobVacanciesTable from '@/components/report/JobVacanciesTable'
+import ApplicantsRegisteredTable from '@/components/report/ApplicantsRegisteredTable'
+import ApplicantsReferredTable from '@/components/report/ApplicantsReferredTable'
+import ApplicantsPlacedTable from '@/components/report/ApplicantsPlacedTable'
+import AdditionalProgramsTable from '@/components/report/AdditionalProgramsTable'
+import JobsFairTable from '@/components/report/JobsFairTable'
+import { toast } from 'react-hot-toast'
 
 interface UserProfile {
   name: string;
@@ -85,6 +92,7 @@ export default function ReportEntryPage() {
 
         if (error) {
           console.error('Error fetching user profile:', error);
+          toast.error('Failed to fetch user profile');
           return;
         }
 
@@ -93,19 +101,38 @@ export default function ReportEntryPage() {
         }
       } catch (error) {
         console.error('Error:', error);
+        toast.error('An error occurred while fetching user profile');
       }
     };
 
     const fetchReports = async () => {
-      setLoading(true)
-      const data = await reportService.getUserReports()
-      setReportData(data)
-      setLoading(false)
-    }
+      setLoading(true);
+      try {
+        const data = await reportService.getUserReports();
+        if (data && data.length > 0) {
+          // Sort reports by reporting period in descending order
+          const sortedReports = data.sort((a, b) =>
+            new Date(b.reporting_period).getTime() - new Date(a.reporting_period).getTime()
+          );
+          setReportData(sortedReports);
+        } else {
+          setReportData([]);
+        }
+      } catch (error) {
+        console.error('Error fetching reports:', error);
+        toast.error('Failed to fetch reports');
+        setReportData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    fetchUserProfile();
-    fetchReports()
-  }, [router, user?.email])
+    // Fetch data in parallel
+    Promise.all([fetchUserProfile(), fetchReports()]).catch(error => {
+      console.error('Error in parallel data fetching:', error);
+      toast.error('An error occurred while fetching data');
+    });
+  }, [router, user?.email]);
 
   const handleExportPDF = async (reportElement: HTMLElement, index: number) => {
     try {
@@ -164,86 +191,77 @@ export default function ReportEntryPage() {
       }
     };
 
-    const summary = entries.reduce((acc, entry) => {
-      const currentValue = entry.current_period;
-      const isFemale = entry.sub_sub_indicator === 'FEMALE';
+    // Helper to get total, female, male for a given program
+    function getGenderBreakdown(program: string) {
+      const total = entries
+        .filter(e => e.program === program && e.sub_sub_indicator !== 'FEMALE')
+        .reduce((sum, e) => sum + (e.current_period || 0), 0);
+      const female = entries
+        .filter(e => e.program === program && e.sub_sub_indicator === 'FEMALE')
+        .reduce((sum, e) => sum + (e.current_female_count || 0), 0);
+      const male = total - female;
+      return { total, female, male };
+    }
 
-      if (entry.program === 'JOB_VACANCIES' && entry.sub_indicator === 'LOCAL_EMPLOYMENT') {
-        acc.vacancies.total += currentValue;
-        if (isFemale) {
-          acc.vacancies.female += currentValue;
-        } else {
-          acc.vacancies.male += currentValue;
-        }
-      }
+    // Registered
+    const reg = getGenderBreakdown('APPLICANTS_REGISTERED');
+    initialSummary.registered = reg;
 
-      if (entry.program === 'APPLICANTS_REGISTERED') {
-        acc.registered.total += currentValue;
-        if (isFemale) {
-          acc.registered.female += currentValue;
-        } else {
-          acc.registered.male += currentValue;
-        }
-      }
+    // Vacancies
+    const vac = getGenderBreakdown('JOB_VACANCIES');
+    initialSummary.vacancies = vac;
 
-      if (entry.program === 'APPLICANTS_REFERRED') {
-        acc.referred.total += currentValue;
-        if (isFemale) {
-          acc.referred.female += currentValue;
-        } else {
-          acc.referred.male += currentValue;
-        }
-      }
+    // Referred
+    const ref = getGenderBreakdown('APPLICANTS_REFERRED');
+    initialSummary.referred = ref;
 
+    // Placed
+    const placed = getGenderBreakdown('APPLICANTS_PLACED');
+    initialSummary.placed.total = placed.total;
+    initialSummary.placed.female = placed.female;
+    initialSummary.placed.male = placed.male;
+    // Placement by sector (unchanged)
+    entries.forEach(entry => {
       if (entry.program === 'APPLICANTS_PLACED') {
-        acc.placed.total += currentValue;
-
         if (entry.sub_indicator === 'PUBLIC_SECTOR') {
-          acc.placed.government += currentValue;
+          initialSummary.placed.government += entry.current_period || 0;
         } else if (entry.sub_indicator === 'PRIVATE_SECTOR') {
-          acc.placed.private += currentValue;
+          initialSummary.placed.private += entry.current_period || 0;
         } else if (entry.sub_indicator === 'OVERSEAS') {
-          acc.placed.overseas += currentValue;
-        }
-
-        if (isFemale) {
-          acc.placed.female += currentValue;
-        } else {
-          acc.placed.male += currentValue;
+          initialSummary.placed.overseas += entry.current_period || 0;
         }
       }
+    });
 
-      // Update job seekers counts
-      if (isFemale) {
-        acc.jobSeekers.gender.female += currentValue;
-      } else {
-        acc.jobSeekers.gender.male += currentValue;
+    // Job Seekers Profile: gender
+    initialSummary.jobSeekers.gender.female = entries
+      .filter(e => e.program === 'APPLICANTS_REGISTERED' && e.sub_sub_indicator === 'FEMALE')
+      .reduce((sum, e) => sum + (e.current_female_count || 0), 0);
+    initialSummary.jobSeekers.gender.male = reg.total - initialSummary.jobSeekers.gender.female;
+
+    // Job Seekers Profile: age and education (unchanged)
+    entries.forEach(entry => {
+      if (entry.program === 'APPLICANTS_REGISTERED') {
+        if (entry.sub_indicator === 'AGE_15_24') {
+          initialSummary.jobSeekers.age['15-24'] += entry.current_period || 0;
+        } else if (entry.sub_indicator === 'AGE_25_54') {
+          initialSummary.jobSeekers.age['25-54'] += entry.current_period || 0;
+        } else if (entry.sub_indicator === 'AGE_55_ABOVE') {
+          initialSummary.jobSeekers.age['55-above'] += entry.current_period || 0;
+        }
+        if (entry.sub_indicator === 'ELEMENTARY') {
+          initialSummary.jobSeekers.education.elementary += entry.current_period || 0;
+        } else if (entry.sub_indicator === 'SECONDARY') {
+          initialSummary.jobSeekers.education.secondary += entry.current_period || 0;
+        } else if (entry.sub_indicator === 'COLLEGE') {
+          initialSummary.jobSeekers.education.college += entry.current_period || 0;
+        } else if (entry.sub_indicator === 'GRADUATE') {
+          initialSummary.jobSeekers.education.graduate += entry.current_period || 0;
+        }
       }
+    });
 
-      // Update age groups
-      if (entry.sub_indicator === 'AGE_15_24') {
-        acc.jobSeekers.age['15-24'] += currentValue;
-      } else if (entry.sub_indicator === 'AGE_25_54') {
-        acc.jobSeekers.age['25-54'] += currentValue;
-      } else if (entry.sub_indicator === 'AGE_55_ABOVE') {
-        acc.jobSeekers.age['55-above'] += currentValue;
-      }
-
-      // Update education levels
-      if (entry.sub_indicator === 'ELEMENTARY') {
-        acc.jobSeekers.education.elementary += currentValue;
-      } else if (entry.sub_indicator === 'SECONDARY') {
-        acc.jobSeekers.education.secondary += currentValue;
-      } else if (entry.sub_indicator === 'COLLEGE') {
-        acc.jobSeekers.education.college += currentValue;
-      } else if (entry.sub_indicator === 'GRADUATE') {
-        acc.jobSeekers.education.graduate += currentValue;
-      }
-
-      return acc;
-    }, initialSummary);
-
-    return summary;
+    return initialSummary;
   };
 
   const formatIndicatorName = (name: string) => {
@@ -363,71 +381,45 @@ export default function ReportEntryPage() {
 
             {/* Table Section */}
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="px-6 py-4 text-left border-b border-gray-200 font-semibold text-gray-900 w-[8%]">KRA</th>
-                    <th className="px-6 py-4 text-left border-b border-gray-200 font-semibold text-gray-900 w-[20%]">INDICATOR</th>
-                    <th className="px-6 py-4 text-left border-b border-gray-200 font-semibold text-gray-900 w-[35%]">
-                      <div>OTHER SPECIFICATION</div>
-                    </th>
-                    <th className="px-6 py-4 text-center border-b border-gray-200 font-semibold text-gray-900 w-[12%]">
-                      <div>PREVIOUS</div>
-                      <div className="text-xs font-normal text-gray-500">REPORTING PERIOD</div>
-                    </th>
-                    <th className="px-6 py-4 text-center border-b border-gray-200 font-semibold text-gray-900 w-[12%]">
-                      <div>CURRENT</div>
-                      <div className="text-xs font-normal text-gray-500">REPORTING PERIOD</div>
-                    </th>
-                    <th className="px-6 py-4 text-center border-b border-gray-200 font-semibold text-gray-900">REMARKS</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {reportData[selectedReportIndex].entries && reportData[selectedReportIndex].entries.length > 0 ? (
-                    reportData[selectedReportIndex].entries.map((entry, index) => (
-                      <tr key={index} className="group hover:bg-blue-50 transition-colors">
-                        <td className="px-6 py-4">I</td>
-                        <td className="px-6 py-4">
-                          <div className="space-y-3">
-                            <div className="font-medium text-gray-900">{formatIndicatorName(entry.program)}</div>
-                            <div className="text-sm text-gray-600">{formatIndicatorName(entry.indicator)}</div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="space-y-3">
-                            {entry.sub_indicator && (
-                              <div className="text-sm text-gray-600">{formatIndicatorName(entry.sub_indicator)}</div>
-                            )}
-                            {entry.sub_sub_indicator && (
-                              <div className="text-sm text-gray-500">{formatIndicatorName(entry.sub_sub_indicator)}</div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {entry.previous_report_period}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {entry.current_period}
-                        </td>
-                        <td className="px-6 py-4 text-center text-gray-500">
-                          {entry.remarks || '-'}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                        <div className="flex flex-col items-center justify-center">
-                          <svg className="h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <p>No entries available for this report</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              <JobVacanciesTable
+                reportData={reportData}
+                selectedReportIndex={selectedReportIndex}
+              />
+            </div>
+
+            <div className="mt-8">
+              <ApplicantsRegisteredTable
+                reportData={reportData}
+                selectedReportIndex={selectedReportIndex}
+              />
+            </div>
+
+            <div className="mt-8">
+              <ApplicantsReferredTable
+                reportData={reportData}
+                selectedReportIndex={selectedReportIndex}
+              />
+            </div>
+
+            <div className="mt-8">
+              <ApplicantsPlacedTable
+                reportData={reportData}
+                selectedReportIndex={selectedReportIndex}
+              />
+            </div>
+
+            <div className="mt-8">
+              <AdditionalProgramsTable
+                reportData={reportData}
+                selectedReportIndex={selectedReportIndex}
+              />
+            </div>
+
+            <div className="mt-8">
+              <JobsFairTable
+                reportData={reportData}
+                selectedReportIndex={selectedReportIndex}
+              />
             </div>
           </div>
 

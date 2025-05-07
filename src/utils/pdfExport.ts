@@ -61,33 +61,41 @@ const extractTableData = (table: HTMLTableElement) => {
 
     // Extract data rows
     const rows = table.querySelectorAll('tbody tr')
-    rows.forEach(row => {
+    rows.forEach((row, rowIndex) => {
         const cells = row.querySelectorAll('td')
         const rowData: string[] = []
 
         cells.forEach((cell, index) => {
-            if (index === 2) { // This is the specifications column
-                const specDivs = cell.querySelectorAll('div div')
-                const primarySpec = specDivs[0]?.textContent?.trim() || ''
-                const secondarySpec = specDivs[1]?.textContent?.trim() || ''
-                // Format specifications with proper spacing
-                const combinedSpec = secondarySpec
-                    ? `${primarySpec}\n\n${secondarySpec}`  // Add extra line break between specs
-                    : primarySpec
-                rowData.push(combinedSpec)
-            } else if (index === 1) {
-                // Format program/indicator with proper spacing
-                const program = cell.querySelector('div:first-child')?.textContent?.trim() || ''
-                const indicator = cell.querySelector('div:last-child')?.textContent?.trim() || ''
-                // Split program and indicator into separate lines with extra spacing
-                const formattedProgram = program.split(' ').join('\n')
-                const formattedIndicator = indicator.split(' ').join('\n')
-                rowData.push(`${formattedProgram}\n\n${formattedIndicator}`)  // Add extra line break between program and indicator
-            } else if (index === 0) {
+            if (index === 0) { // KRA column
                 rowData.push(cell.textContent?.trim() || '')
-            } else if (index === 3 || index === 4) {
-                // For numeric columns, just add the value
-                rowData.push(cell.textContent?.trim() || '0')
+            } else if (index === 1) { // INDICATOR column
+                let indicatorText = cell.textContent?.trim() || ''
+                let indentLevel = 0
+                // Try to extract indicator number (e.g., '1.1.1.1')
+                const match = indicatorText.match(/^(\d+(?:\.\d+)*)(.*)$/)
+                if (match) {
+                    const numberPart = match[1]
+                    indentLevel = (numberPart.match(/\./g) || []).length
+                    indicatorText = match[0].trim()
+                }
+                // Add indentation based on level
+                const indent = '    '.repeat(indentLevel)
+                rowData.push(indent + indicatorText)
+            } else if (index === 2) { // SPECIFICATIONS column
+                const specDivs = cell.querySelectorAll('div div')
+                const specs: string[] = []
+                specDivs.forEach((div, i) => {
+                    const text = div.textContent?.trim() || ''
+                    if (text) {
+                        // Add indentation based on level
+                        const indent = '  '.repeat(i)
+                        specs.push(`${indent}${text}`)
+                    }
+                })
+                rowData.push(specs.join('\n'))
+            } else if (index === 3 || index === 4) { // PREVIOUS and CURRENT columns
+                const value = cell.textContent?.trim() || '0'
+                rowData.push(value)
             }
         })
 
@@ -190,6 +198,17 @@ const addHeaderToNewPage = (pdf: jsPDF, pageNumber: number, totalPages: number) 
     pdf.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - 25, 15);
 };
 
+// Fix margin extraction for left/right
+const getMargin = (margin: any) => {
+    if (typeof margin === 'object' && margin !== null && 'left' in margin && 'right' in margin) {
+        return { left: margin.left, right: margin.right };
+    } else if (typeof margin === 'number') {
+        return { left: margin, right: margin };
+    } else {
+        return { left: 15, right: 15 };
+    }
+};
+
 export const exportToPDF = async (
     reportElement: HTMLElement,
     filename: string,
@@ -250,16 +269,17 @@ export const exportToPDF = async (
 
         // Add PESO office and DOLE header
         const pesoOffice = reportElement.querySelector('.reporting-office')?.textContent || 'PESO OFFICE';
+        const { left: leftMargin, right: rightMargin } = getMargin(pdfStyles.table.margin);
         pdf.setFontSize(pdfStyles.fonts.header);
-        pdf.text(pesoOffice, 15, currentY);
+        pdf.text(pesoOffice, leftMargin, currentY, { align: 'left' });
         pdf.text('DEPARTMENT OF LABOR AND EMPLOYMENT', pageWidth / 2, currentY, { align: 'center' });
         currentY += 10;
 
         // Add reporting period and regional office
         const reportingPeriod = reportElement.querySelector('.reporting-period')?.textContent || '';
-        pdf.text('Monthly Report', 15, currentY);
+        pdf.text('Monthly Report', leftMargin, currentY, { align: 'left' });
         pdf.text('Regional Office No. X', pageWidth / 2, currentY, { align: 'center' });
-        pdf.text(reportingPeriod, pageWidth - 45, currentY);
+        pdf.text(reportingPeriod, rightMargin, currentY, { align: 'right' });
         currentY += 10;
 
         // Add instructions with proper spacing
@@ -269,77 +289,134 @@ export const exportToPDF = async (
         pdf.text(splitInstructions, 15, currentY);
         currentY += splitInstructions.length * 5 + 10;
 
-        // Extract and format table data
-        const { data } = extractTableData(reportElement.querySelector('table')!);
+        // Get all tables from the report element
+        const tables = reportElement.querySelectorAll('table');
 
-        // Enhanced table configuration
-        const tableConfig = {
-            ...pdfStyles.table,
-            head: tableHeaders,
-            body: data,
-            startY: currentY,
-            margin: { top: 20, bottom: 20 },
-            rowPageBreak: 'auto' as const,
-            bodyStyles: {
-                ...pdfStyles.table.bodyStyles,
-                minCellHeight: 16, // Increased minimum height for better spacing
-                cellPadding: [3, 3, 3, 3] // Equal padding on all sides
-            },
-            didDrawPage: (data: any) => {
-                if (data.pageNumber > 1) {
-                    addHeaderToNewPage(pdf, data.pageNumber, data.pageCount);
-                }
-                currentY = data.cursor.y;
-            },
-            didDrawCell: (data: any) => {
-                // Adjust cell padding based on content
-                if (data.cell.text && typeof data.cell.text === 'string') {
-                    const lines = data.cell.text.split('\n');
-                    if (lines.length > 1) {
+        // Process each table
+        tables.forEach((table, index) => {
+            // Add section header for each form
+            const formNumber = index + 1;
+            const formTitle = getFormTitle(formNumber);
+
+            // Check if we need a new page for the section header
+            checkForNewPage(20);
+
+            // Add section header
+            pdf.setFontSize(pdfStyles.fonts.subHeader);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(`Form ${formNumber}: ${formTitle}`, 15, currentY);
+            currentY += 10;
+
+            // Extract and format table data
+            const { data } = extractTableData(table);
+
+            // Enhanced table configuration
+            const tableConfig = {
+                ...pdfStyles.table,
+                head: tableHeaders,
+                body: data,
+                startY: currentY,
+                margin: { top: 20, bottom: 20 },
+                rowPageBreak: 'auto' as const,
+                styles: {
+                    fontSize: pdfStyles.fonts.normal,
+                    cellPadding: 2,
+                    overflow: 'linebreak' as const,
+                    halign: 'left' as const,
+                    valign: 'middle' as const
+                },
+                headStyles: {
+                    fillColor: [0, 0, 0] as [number, number, number],
+                    textColor: [255, 255, 255] as [number, number, number],
+                    fontStyle: 'bold' as const
+                },
+                columnStyles: {
+                    0: { cellWidth: 30 }, // KRA
+                    1: { cellWidth: 20, cellPadding: 3, overflow: 'linebreak' as const }, // INDICATOR (wider for PROGRAM+INDICATOR)
+                    2: { cellWidth: 60 }, // OTHER SPECIFICATION
+                    3: {
+                        cellWidth: 35,
+                        halign: 'center' as const,
+                        valign: 'middle' as const,
+                        cellPadding: [3, 3, 3, 3]
+                    }, // PREVIOUS
+                    4: {
+                        cellWidth: 35,
+                        halign: 'center' as const,
+                        valign: 'middle' as const,
+                        cellPadding: [3, 3, 3, 3]
+                    }  // CURRENT
+                },
+                bodyStyles: {
+                    minCellHeight: 16,
+                    cellPadding: [3, 3, 3, 3]
+                },
+                didDrawPage: (data: any) => {
+                    if (data.pageNumber > 1) {
+                        addHeaderToNewPage(pdf, data.pageNumber, data.pageCount);
+                    }
+                    currentY = data.cursor.y;
+                },
+                didDrawCell: (data: any) => {
+                    // For PREVIOUS and CURRENT columns, ensure value is centered vertically and horizontally as a single line
+                    if (data.column.index === 3 || data.column.index === 4) {
+                        data.cell.styles.valign = 'middle';
+                        data.cell.styles.halign = 'center';
                         data.cell.styles.cellPadding = [3, 3, 3, 3];
                     }
+                    // Handle multi-line text in OTHER SPECIFICATION column
+                    if (data.column.index === 2 && data.cell.text && typeof data.cell.text === 'string') {
+                        const lines = data.cell.text.split('\n');
+                        if (lines.length > 1) {
+                            data.cell.styles.cellPadding = [3, 3, 3, 3];
+                            data.cell.styles.valign = 'middle';
+                        }
+                    }
                 }
-            }
-        };
+            };
 
-        // Add table with auto-pagination
-        await autoTable(pdf, tableConfig);
-        currentY = (pdf as any).lastAutoTable.finalY + 20;
+            // Add table with auto-pagination
+            autoTable(pdf, tableConfig);
+            currentY = (pdf as any).lastAutoTable.finalY + 20;
+
+            // Add spacing between tables
+            currentY += 10;
+        });
 
         // Check if we need a new page for footer
-        checkForNewPage(80); // Reserve space for footer section
+        checkForNewPage(80);
 
         // Footer section with profile data
-        const leftColumn = 15;
-        const rightColumn = pageWidth / 2;
+        const leftColumn = leftMargin;
+        const rightColumn = rightMargin;
 
         pdf.setFontSize(pdfStyles.fonts.normal);
-        pdf.text('PREPARED BY:', leftColumn, currentY);
-        pdf.text('APPROVED:', rightColumn, currentY);
+        pdf.text('PREPARED BY:', leftColumn, currentY, { align: 'left' });
+        pdf.text('APPROVED:', rightColumn, currentY, { align: 'right' });
         currentY += 15;
 
         // Add preparer details using profile data
         pdf.setFontSize(pdfStyles.fonts.subHeader);
-        pdf.text(profile?.name || '', leftColumn, currentY);
+        pdf.text(profile?.name || '', leftColumn, currentY, { align: 'left' });
         currentY += 5;
         pdf.setFontSize(pdfStyles.fonts.normal);
-        pdf.text('PESO MANAGER - Designate', leftColumn, currentY);
+        pdf.text('PESO MANAGER - Designate', leftColumn, currentY, { align: 'left' });
 
         // Add approver details using profile data
         pdf.setFontSize(pdfStyles.fonts.subHeader);
-        pdf.text(`HON. ${profile?.municipal_mayor || ''}`, rightColumn, currentY - 5);
+        pdf.text(`HON. ${profile?.municipal_mayor || ''}`, rightColumn, currentY - 5, { align: 'right' });
         pdf.setFontSize(pdfStyles.fonts.normal);
-        pdf.text('MUNICIPAL MAYOR', rightColumn, currentY);
+        pdf.text('MUNICIPAL MAYOR', rightColumn, currentY, { align: 'right' });
 
         currentY += 15;
 
         // Add dates with proper spacing
         const currentDate = format(new Date(), 'dd-MMM-yy');
-        pdf.text(currentDate, leftColumn, currentY);
-        pdf.text('_______________________________________', rightColumn, currentY);
+        pdf.text(currentDate, leftColumn, currentY, { align: 'left' });
+        pdf.text('_______________________________________', rightColumn, currentY, { align: 'right' });
         currentY += 5;
-        pdf.text('Date', leftColumn, currentY);
-        pdf.text('Date', rightColumn, currentY);
+        pdf.text('Date', leftColumn, currentY, { align: 'left' });
+        pdf.text('Date', rightColumn, currentY, { align: 'right' });
 
         currentY += 15;
 
@@ -360,4 +437,22 @@ export const exportToPDF = async (
         if (onExportEnd) onExportEnd();
         throw error;
     }
+};
+
+// Helper function to get form titles
+const getFormTitle = (formNumber: number): string => {
+    const formTitles: { [key: number]: string } = {
+        1: 'Job Vacancies Solicited/Reported',
+        2: 'Applicants Registered',
+        3: 'Applicants Referred',
+        4: 'Applicants Placed',
+        5: 'Number of Projects Implemented for PWDs',
+        6: 'Training Conducted for PWDs',
+        7: 'Total Applicants Counselled',
+        8: 'Total Applicants Tested',
+        9: 'Career Guidance Conducted',
+        10: 'Jobs Fair',
+        11: 'Livelihood and Self-employment'
+    };
+    return formTitles[formNumber] || `Form ${formNumber}`;
 }; 
