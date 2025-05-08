@@ -7,6 +7,8 @@ import { useAuth } from '../context/AuthContext'
 import { exportToPDF } from '@/utils/pdfExport'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../utils/supabaseClient'
+import * as XLSX from 'xlsx'
+import { exportSPRSExcelFromReport } from '@/utils/sprsExcelExport'
 
 interface UserProfile {
   name: string;
@@ -304,6 +306,12 @@ export default function AdminPage() {
                         className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition"
                       >
                         {exportingSummary ? 'Exporting...' : 'Export Summary'}
+                      </button>
+                      <button
+                        onClick={() => exportSPRSExcelFromReport(report, `report-${report.reporting_period || 'report'}.xlsx`)}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
+                      >
+                        Export Excel
                       </button>
                       <span className="ml-2 inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold shadow-sm">{report.entries?.length || 0} entries</span>
                     </div>

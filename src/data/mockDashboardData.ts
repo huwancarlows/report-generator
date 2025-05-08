@@ -123,17 +123,15 @@ const baseEducationData = {
 
 // Base data structure for sector distribution
 const baseSectorData = {
-    labels: ['Private Sector', 'Government', 'NGO/Non-Profit'],
+    labels: ['Private Sector', 'Government'],
     datasets: [{
         backgroundColor: [
             'rgba(71, 85, 105, 0.8)',   // Slate
-            'rgba(20, 184, 166, 0.8)',   // Teal
-            'rgba(109, 40, 217, 0.8)'    // Purple
+            'rgba(20, 184, 166, 0.8)'   // Teal
         ],
         borderColor: [
             'rgb(51, 65, 85)',         // Darker Slate
-            'rgb(17, 94, 89)',         // Darker Teal
-            'rgb(88, 28, 135)'         // Darker Purple
+            'rgb(17, 94, 89)'          // Darker Teal
         ],
         borderWidth: 1,
         data: [] as number[]
@@ -206,7 +204,7 @@ const mockData: YearlyData = {
             ...baseSectorData,
             datasets: [{
                 ...baseSectorData.datasets[0],
-                data: [70, 20, 10] // Strong private sector employment
+                data: [70, 20] // Private, Government
             }]
         },
         quickStats: {
@@ -272,7 +270,7 @@ const mockData: YearlyData = {
             ...baseSectorData,
             datasets: [{
                 ...baseSectorData.datasets[0],
-                data: [65, 25, 10] // Balanced sector distribution
+                data: [65, 25] // Private, Government
             }]
         },
         quickStats: {
@@ -338,7 +336,7 @@ const mockData: YearlyData = {
             ...baseSectorData,
             datasets: [{
                 ...baseSectorData.datasets[0],
-                data: [60, 30, 10] // Government sector focus
+                data: [60, 30] // Private, Government
             }]
         },
         quickStats: {

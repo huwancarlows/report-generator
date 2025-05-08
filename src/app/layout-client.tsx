@@ -38,10 +38,10 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
           }`}
       >
         {shouldShowSidebar && (
-          <header className="sticky top-0 z-30 bg-white dark:bg-gray-800 shadow-sm w-full">
-            <div className={`flex items-center justify-between px-6 py-4 ${shouldShowSidebar ? 'ml-16 sm:ml-0' : ''} ${isSidebarOpen ? 'mr-0' : ''}`}>
+          <header className="sticky top-0 z-30 w-full bg-white/80 dark:bg-gray-900/90 backdrop-blur-md shadow-lg border-b border-gray-200 dark:border-gray-800">
+            <div className={`flex items-center justify-between px-8 py-4 ${shouldShowSidebar ? 'ml-16 sm:ml-0' : ''} ${isSidebarOpen ? 'mr-0' : ''}`}>
               <div className="flex items-center space-x-4">
-                <div className="relative w-10 h-10">
+                <div className="relative w-12 h-12 drop-shadow-md">
                   <Image
                     src="/dole-logo.png"
                     alt="DOLE Logo"
@@ -51,25 +51,25 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
                   />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
                     DOLE Region X
                   </h1>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium">
                     Public Employment Service Office
                   </p>
                 </div>
               </div>
-              <div className="flex items-center space-x-4">
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+              <div className="flex items-center space-x-5">
+                <div className="text-right group cursor-pointer transition-all">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
                     {user?.email}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-blue-400 transition-colors">
                     {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
                   </p>
                 </div>
-                <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
-                  <span className="text-white font-medium text-sm">
+                <div className="h-11 w-11 rounded-full bg-blue-600 flex items-center justify-center shadow-lg ring-2 ring-blue-300 dark:ring-blue-900 transition-all hover:scale-105 cursor-pointer">
+                  <span className="text-white font-bold text-lg select-none">
                     {user?.email?.charAt(0).toUpperCase()}
                   </span>
                 </div>

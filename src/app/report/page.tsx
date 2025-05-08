@@ -904,9 +904,10 @@ export default function ReportPage() {
                                     type="number"
                                     min="0"
                                     className="w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                    value={indicatorRow?.previous_report_period || 0}
+                                    value={indicatorRow?.previous_report_period === 0 || indicatorRow?.previous_report_period === undefined ? '' : indicatorRow?.previous_report_period}
                                     onChange={(e) => {
-                                      const newValue = parseInt(e.target.value) || 0;
+                                      let val = e.target.value.replace(/^0+(?!$)/, '');
+                                      const newValue = val === '' ? 0 : parseInt(val) || 0;
                                       updateIndicatorValue(program.value, indicator.value, "previous_report_period", newValue);
                                     }}
                                   />
@@ -917,9 +918,10 @@ export default function ReportPage() {
                                     type="number"
                                     min="0"
                                     className="w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                    value={indicatorRow?.current_period || 0}
+                                    value={indicatorRow?.current_period === 0 || indicatorRow?.current_period === undefined ? '' : indicatorRow?.current_period}
                                     onChange={(e) => {
-                                      const newValue = parseInt(e.target.value) || 0;
+                                      let val = e.target.value.replace(/^0+(?!$)/, '');
+                                      const newValue = val === '' ? 0 : parseInt(val) || 0;
                                       updateIndicatorValue(program.value, indicator.value, "current_period", newValue);
                                     }}
                                   />
@@ -1014,17 +1016,31 @@ export default function ReportPage() {
                                         <input
                                           type="number"
                                           min="0"
-                                          className="w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                          value={subIndicatorRow?.previous_report_period || 0}
-                                          onChange={(e) => {
-                                            const newValue = parseInt(e.target.value) || 0;
-                                            updateSubIndicatorValue(
-                                              program.value,
-                                              indicator.value,
-                                              subInd.value,
-                                              "previous_report_period",
-                                              newValue
-                                            );
+                                          className={subInd.value.includes('FEMALE') && subSubIndicators.length === 0 ? "w-full px-3 py-2 rounded-lg border border-pink-200 text-center focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors bg-pink-50/30" : "w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"}
+                                          value={subInd.value.includes('FEMALE') && subSubIndicators.length === 0
+                                            ? (subIndicatorRow?.previous_female_count === 0 || subIndicatorRow?.previous_female_count === undefined ? '' : subIndicatorRow?.previous_female_count)
+                                            : (subIndicatorRow?.previous_report_period === 0 || subIndicatorRow?.previous_report_period === undefined ? '' : subIndicatorRow?.previous_report_period)
+                                          }
+                                          onChange={e => {
+                                            let val = e.target.value.replace(/^0+(?!$)/, '');
+                                            const newValue = val === '' ? 0 : parseInt(val) || 0;
+                                            if (subInd.value.includes('FEMALE') && subSubIndicators.length === 0) {
+                                              updateSubIndicatorValue(
+                                                program.value,
+                                                indicator.value,
+                                                subInd.value,
+                                                'previous_report_period',
+                                                newValue
+                                              );
+                                            } else {
+                                              updateSubIndicatorValue(
+                                                program.value,
+                                                indicator.value,
+                                                subInd.value,
+                                                'previous_report_period',
+                                                newValue
+                                              );
+                                            }
                                           }}
                                         />
                                       </td>
@@ -1032,17 +1048,31 @@ export default function ReportPage() {
                                         <input
                                           type="number"
                                           min="0"
-                                          className="w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                          value={subIndicatorRow?.current_period || 0}
-                                          onChange={(e) => {
-                                            const newValue = parseInt(e.target.value) || 0;
-                                            updateSubIndicatorValue(
-                                              program.value,
-                                              indicator.value,
-                                              subInd.value,
-                                              "current_period",
-                                              newValue
-                                            );
+                                          className={subInd.value.includes('FEMALE') && subSubIndicators.length === 0 ? "w-full px-3 py-2 rounded-lg border border-pink-200 text-center focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors bg-pink-50/30" : "w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"}
+                                          value={subInd.value.includes('FEMALE') && subSubIndicators.length === 0
+                                            ? (subIndicatorRow?.current_female_count === 0 || subIndicatorRow?.current_female_count === undefined ? '' : subIndicatorRow?.current_female_count)
+                                            : (subIndicatorRow?.current_period === 0 || subIndicatorRow?.current_period === undefined ? '' : subIndicatorRow?.current_period)
+                                          }
+                                          onChange={e => {
+                                            let val = e.target.value.replace(/^0+(?!$)/, '');
+                                            const newValue = val === '' ? 0 : parseInt(val) || 0;
+                                            if (subInd.value.includes('FEMALE') && subSubIndicators.length === 0) {
+                                              updateSubIndicatorValue(
+                                                program.value,
+                                                indicator.value,
+                                                subInd.value,
+                                                'current_period',
+                                                newValue
+                                              );
+                                            } else {
+                                              updateSubIndicatorValue(
+                                                program.value,
+                                                indicator.value,
+                                                subInd.value,
+                                                'current_period',
+                                                newValue
+                                              );
+                                            }
                                           }}
                                         />
                                       </td>
@@ -1075,9 +1105,10 @@ export default function ReportPage() {
                                               type="number"
                                               min="0"
                                               className={isFemale ? "w-full px-3 py-2 rounded-lg border border-pink-200 text-center focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors bg-pink-50/30" : "w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"}
-                                              value={isFemale ? (subSubIndicatorRow?.previous_female_count || 0) : (subSubIndicatorRow?.previous_report_period || 0)}
+                                              value={isFemale ? (subSubIndicatorRow?.previous_female_count === 0 || subSubIndicatorRow?.previous_female_count === undefined ? '' : subSubIndicatorRow?.previous_female_count) : (subSubIndicatorRow?.previous_report_period === 0 || subSubIndicatorRow?.previous_report_period === undefined ? '' : subSubIndicatorRow?.previous_report_period)}
                                               onChange={(e) => {
-                                                const newValue = parseInt(e.target.value) || 0;
+                                                let val = e.target.value.replace(/^0+(?!$)/, '');
+                                                const newValue = val === '' ? 0 : parseInt(val) || 0;
                                                 if (isFemale) {
                                                   updateSubSubIndicatorValue(
                                                     program.value,
@@ -1113,9 +1144,10 @@ export default function ReportPage() {
                                               type="number"
                                               min="0"
                                               className={isFemale ? "w-full px-3 py-2 rounded-lg border border-pink-200 text-center focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-colors bg-pink-50/30" : "w-full px-3 py-2 rounded-lg border border-gray-300 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"}
-                                              value={isFemale ? (subSubIndicatorRow?.current_female_count || 0) : (subSubIndicatorRow?.current_period || 0)}
+                                              value={isFemale ? (subSubIndicatorRow?.current_female_count === 0 || subSubIndicatorRow?.current_female_count === undefined ? '' : subSubIndicatorRow?.current_female_count) : (subSubIndicatorRow?.current_period === 0 || subSubIndicatorRow?.current_period === undefined ? '' : subSubIndicatorRow?.current_period)}
                                               onChange={(e) => {
-                                                const newValue = parseInt(e.target.value) || 0;
+                                                let val = e.target.value.replace(/^0+(?!$)/, '');
+                                                const newValue = val === '' ? 0 : parseInt(val) || 0;
                                                 if (isFemale) {
                                                   updateSubSubIndicatorValue(
                                                     program.value,

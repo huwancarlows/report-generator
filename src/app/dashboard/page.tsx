@@ -63,6 +63,9 @@ const GenderDistributionChart = ({ genderData, totalApplicants, femaleNumber, ma
   const actualCanvasRef = canvasRef || localCanvasRef;
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Helper to detect dark mode
+  const isDarkMode = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
   // Responsive draw
   const drawChart = useCallback(() => {
     const canvas = actualCanvasRef.current;
@@ -78,10 +81,10 @@ const GenderDistributionChart = ({ genderData, totalApplicants, femaleNumber, ma
     canvas.style.height = '100%';
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    // Fill white background for export
+    // Fill background for export
     ctx.save();
     ctx.globalAlpha = 1;
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = isDarkMode ? '#181c2a' : '#fff';
     ctx.fillRect(0, 0, width, height);
     ctx.restore();
     // Use genderData directly
@@ -166,7 +169,7 @@ const GenderDistributionChart = ({ genderData, totalApplicants, femaleNumber, ma
       const labelY = startY + iconHeight + Math.max(6, iconHeight * 0.08);
       ctx.save();
       ctx.beginPath();
-      ctx.fillStyle = '#F8FAFC';
+      ctx.fillStyle = isDarkMode ? '#232b3e' : '#F8FAFC';
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.2;
       ctx.roundRect(x - labelWidth / 2, labelY, labelWidth, labelHeight, 8);
@@ -179,9 +182,11 @@ const GenderDistributionChart = ({ genderData, totalApplicants, femaleNumber, ma
       ctx.fillText(actualNumber.toLocaleString(), x, labelY + labelHeight * 0.38);
       // Label
       ctx.font = `${Math.max(10, Math.round(labelHeight * 0.28))}px Inter, Arial, sans-serif`;
+      ctx.fillStyle = isDarkMode ? '#e0e7ef' : '#22223b';
       ctx.fillText(label, x, labelY + labelHeight * 0.62);
       // Percentage
       ctx.font = `${Math.max(9, Math.round(labelHeight * 0.22))}px Inter, Arial, sans-serif`;
+      ctx.fillStyle = isDarkMode ? '#cbd5e1' : '#475569';
       ctx.fillText(`${percentage}%`, x, labelY + labelHeight * 0.84);
     };
     // Draw female label
@@ -196,11 +201,11 @@ const GenderDistributionChart = ({ genderData, totalApplicants, femaleNumber, ma
     }
     // Optional: subtle border for the canvas
     ctx.save();
-    ctx.strokeStyle = '#e5e7eb';
+    ctx.strokeStyle = isDarkMode ? '#232b3e' : '#e5e7eb';
     ctx.lineWidth = 1;
     ctx.strokeRect(0, 0, width, height);
     ctx.restore();
-  }, [genderData, totalApplicants, femaleNumber, maleNumber]);
+  }, [genderData, totalApplicants, femaleNumber, maleNumber, isDarkMode]);
 
   useEffect(() => {
     drawChart();
@@ -208,7 +213,16 @@ const GenderDistributionChart = ({ genderData, totalApplicants, femaleNumber, ma
     // Redraw on resize
     const ro = new window.ResizeObserver(() => drawChart());
     ro.observe(containerRef.current);
-    return () => ro.disconnect();
+    // Redraw on dark mode change
+    let darkModeMedia: MediaQueryList | null = null;
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      darkModeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+      darkModeMedia.addEventListener('change', drawChart);
+    }
+    return () => {
+      ro.disconnect();
+      if (darkModeMedia) darkModeMedia.removeEventListener('change', drawChart);
+    };
   }, [drawChart, forceRedraw]);
 
   return (
@@ -705,21 +719,21 @@ export default function DashboardPage() {
   return (
     <>
       {/* Visible dashboard */}
-      <div ref={dashboardRef} className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+      <div ref={dashboardRef} className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-[#101624] dark:to-[#181c2a]">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
           {/* Enhanced Dashboard Header */}
-          <div className="mb-8 bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+          <div className="mb-8 bg-white dark:bg-[#181c2a] rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-blue-900">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
               <div className="space-y-2">
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
-                  <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-blue-100 flex items-center gap-3">
+                  <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-200">
                     <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                   </span>
                   {user.role === 'admin' ? 'PESO Employment Analytics' : `${user.address} Employment Report`}
                 </h1>
-                <p className="text-gray-600 ml-[60px]">
+                <p className="text-gray-600 dark:text-gray-300 ml-[60px]">
                   {user.role === 'admin'
                     ? 'Comprehensive overview of employment statistics across 26 PESO LGUs'
                     : `Monthly performance metrics for ${user.address || 'Your Municipality'}`
@@ -730,12 +744,12 @@ export default function DashboardPage() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="flex items-center gap-4">
                   <div className="flex flex-col min-w-[140px]">
-                    <label htmlFor="month-select" className="text-sm font-medium text-gray-700 mb-1.5">Select Month</label>
+                    <label htmlFor="month-select" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">Select Month</label>
                     <select
                       id="month-select"
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(e.target.value)}
-                      className="block w-full rounded-lg border-gray-200 bg-white px-4 py-2.5 text-gray-800 shadow-sm hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm font-medium transition-colors duration-200"
+                      className="block w-full rounded-lg border-gray-200 dark:border-blue-900 bg-white dark:bg-[#232b3e] px-4 py-2.5 text-gray-800 dark:text-blue-100 shadow-sm hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm font-medium transition-colors duration-200"
                     >
                       <option value="all">All Months</option>
                       {['January', 'February', 'March', 'April', 'May', 'June',
@@ -746,12 +760,12 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="flex flex-col min-w-[120px]">
-                    <label htmlFor="year-select" className="text-sm font-medium text-gray-700 mb-1.5">Select Year</label>
+                    <label htmlFor="year-select" className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1.5">Select Year</label>
                     <select
                       id="year-select"
                       value={selectedPeriod}
                       onChange={(e) => setSelectedPeriod(e.target.value)}
-                      className="block w-full rounded-lg border-gray-200 bg-white px-4 py-2.5 text-gray-800 shadow-sm hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm font-medium transition-colors duration-200"
+                      className="block w-full rounded-lg border-gray-200 dark:border-blue-900 bg-white dark:bg-[#232b3e] px-4 py-2.5 text-gray-800 dark:text-blue-100 shadow-sm hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm font-medium transition-colors duration-200"
                     >
                       <option value="2024">2024</option>
                       <option value="2023">2023</option>
@@ -805,24 +819,24 @@ export default function DashboardPage() {
               ];
 
               const bgGradients = [
-                'from-blue-50 to-blue-100/50',
-                'from-green-50 to-green-100/50',
-                'from-yellow-50 to-yellow-100/50',
-                'from-red-50 to-red-100/50'
+                'from-blue-50 to-blue-100/50 dark:from-blue-900/40 dark:to-blue-900/10',
+                'from-green-50 to-green-100/50 dark:from-green-900/40 dark:to-green-900/10',
+                'from-yellow-50 to-yellow-100/50 dark:from-yellow-900/40 dark:to-yellow-900/10',
+                'from-red-50 to-red-100/50 dark:from-red-900/40 dark:to-red-900/10'
               ];
 
               const iconColors = [
-                'text-blue-600',
-                'text-green-600',
-                'text-yellow-600',
-                'text-red-600'
+                'text-blue-600 dark:text-blue-200',
+                'text-green-600 dark:text-green-200',
+                'text-yellow-600 dark:text-yellow-200',
+                'text-red-600 dark:text-red-200'
               ];
 
               const borderColors = [
-                'border-blue-100',
-                'border-green-100',
-                'border-yellow-100',
-                'border-red-100'
+                'border-blue-100 dark:border-blue-900',
+                'border-green-100 dark:border-green-900',
+                'border-yellow-100 dark:border-yellow-900',
+                'border-red-100 dark:border-red-900'
               ];
 
               return (
@@ -831,19 +845,19 @@ export default function DashboardPage() {
                   className={`bg-gradient-to-br ${bgGradients[index]} rounded-2xl p-6 shadow-lg border ${borderColors[index]} hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1`}
                 >
                   <div className="flex items-start">
-                    <div className={`p-3 rounded-xl bg-white/80 backdrop-blur-sm ${iconColors[index]} shadow-sm`}>
+                    <div className={`p-3 rounded-xl bg-white/80 dark:bg-[#232b3e] backdrop-blur-sm ${iconColors[index]} shadow-sm`}>
                       {icons[index]}
                     </div>
                     <div className="ml-4">
-                      <h3 className="text-sm font-medium text-gray-600 capitalize mb-1">
+                      <h3 className="text-sm font-medium text-gray-600 dark:text-gray-300 capitalize mb-1">
                         {key.replace(/([A-Z])/g, ' $1').trim()}
                       </h3>
-                      <p className="text-2xl font-bold text-gray-900 mb-2">
+                      <p className="text-2xl font-bold text-gray-900 dark:text-blue-100 mb-2">
                         {stat.value.toLocaleString()}
                       </p>
                       <div className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm ${stat.change > 0
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
+                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200'
+                        : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200'
                         }`}>
                         <svg
                           className={`w-4 h-4 mr-1 ${stat.change > 0 ? 'rotate-0' : 'rotate-180'}`}
@@ -861,35 +875,35 @@ export default function DashboardPage() {
               );
             })}
           </div>
-          <hr className="my-8 border-t-2 border-gray-200" />
+          <hr className="my-8 border-t-2 border-gray-200 dark:border-blue-900" />
           {/* Charts Grid */}
           <div className="grid grid-cols-1 gap-8">
             {/* Monthly Performance Chart */}
             <section
               ref={chartRefs.performance}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
+              className="bg-white dark:bg-[#181c2a] rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-blue-900 hover:shadow-xl transition-all duration-300"
             >
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                    <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-600">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-blue-100 flex items-center gap-3">
+                    <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-200">
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </span>
                     Monthly PESO Performance
                   </h2>
-                  <p className="text-sm text-gray-500 mt-2 ml-[52px]">
+                  <p className="text-sm text-gray-500 dark:text-gray-300 mt-2 ml-[52px]">
                     Track monthly employment facilitation progress
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <label htmlFor="month-group-select" className="text-sm font-medium text-gray-700">Show Months</label>
+                  <label htmlFor="month-group-select" className="text-sm font-medium text-gray-700 dark:text-gray-200">Show Months</label>
                   <select
                     id="month-group-select"
                     value={monthGroup}
                     onChange={e => setMonthGroup(Number(e.target.value))}
-                    className="block rounded-lg border-gray-200 bg-white px-3 py-2 text-gray-800 shadow-sm hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm font-medium transition-colors duration-200"
+                    className="block rounded-lg border-gray-200 dark:border-blue-900 bg-white dark:bg-[#232b3e] px-3 py-2 text-gray-800 dark:text-blue-100 shadow-sm hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm font-medium transition-colors duration-200"
                   >
                     <option value={0}>Jan - Apr</option>
                     <option value={1}>May - Aug</option>
@@ -898,42 +912,42 @@ export default function DashboardPage() {
                   <button
                     onClick={() => handleExportChart('performance')}
                     disabled={isExporting}
-                    className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
+                    className="inline-flex items-center px-4 py-2 bg-gray-50 dark:bg-[#232b3e] text-gray-700 dark:text-blue-100 text-sm font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-[#232b3e]/80 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-blue-900 disabled:bg-gray-50 dark:disabled:bg-[#232b3e] disabled:text-gray-400 transition-all duration-200"
                   >
                     {isExporting ? 'Exporting...' : 'Export Chart'}
                   </button>
                 </div>
               </div>
-              <div className="h-[400px] w-full">
+              <div className="h-[400px] w-full bg-white dark:bg-[#232b3e] rounded-xl p-2">
                 <Bar ref={barRef} data={monthlyGroupData} options={lineChartOptions} />
               </div>
             </section>
 
             {/* Top Available Jobs */}
-            <section ref={chartRefs.jobs} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+            <section ref={chartRefs.jobs} className="bg-white dark:bg-[#181c2a] rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-blue-900 hover:shadow-xl transition-all duration-300">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                    <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-600">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-blue-100 flex items-center gap-3">
+                    <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-200">
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </span>
                     Top 10 Available Jobs
                   </h2>
-                  <p className="text-sm text-gray-500 mt-2 ml-[52px]">
+                  <p className="text-sm text-gray-500 dark:text-gray-300 mt-2 ml-[52px]">
                     Most in-demand positions across all LGUs
                   </p>
                 </div>
                 <button
                   onClick={() => handleExportChart('jobs')}
                   disabled={isExporting}
-                  className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
+                  className="inline-flex items-center px-4 py-2 bg-gray-50 dark:bg-[#232b3e] text-gray-700 dark:text-blue-100 text-sm font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-[#232b3e]/80 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-blue-900 disabled:bg-gray-50 dark:disabled:bg-[#232b3e] disabled:text-gray-400 transition-all duration-200"
                 >
                   {isExporting ? 'Exporting...' : 'Export Chart'}
                 </button>
               </div>
-              <div className="h-[400px] w-full">
+              <div className="h-[400px] w-full bg-white dark:bg-[#232b3e] rounded-xl p-2">
                 <Bar ref={jobsRef} data={dashboardData.topJobsData} options={barChartOptions} />
               </div>
             </section>
@@ -941,102 +955,114 @@ export default function DashboardPage() {
             {/* Statistics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {/* Gender Distribution */}
-              <section ref={chartRefs.gender} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+              <section ref={chartRefs.gender} className="bg-white/80 dark:bg-[#181c2a]/80 rounded-3xl p-7 shadow-2xl border border-blue-100 dark:border-blue-900 hover:shadow-blue-200/40 dark:hover:shadow-blue-900/40 transition-all duration-300 flex flex-col gap-4 backdrop-blur-md group">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-600">
+                    <h2 className="text-xl font-extrabold text-blue-900 dark:text-blue-100 flex items-center gap-3">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-200">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                       </span>
                       Gender Distribution
                     </h2>
-                    <p className="text-sm text-gray-500 mt-2 ml-[52px]">
+                    <p className="text-sm text-gray-500 dark:text-gray-300 mt-2 ml-[52px]">
                       Gender of Registered Applicants
                     </p>
                   </div>
                   <button
                     onClick={() => handleExportChart('gender')}
                     disabled={isExporting}
-                    className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
+                    className="inline-flex items-center px-4 py-2 bg-gray-50 dark:bg-[#232b3e] text-gray-700 dark:text-blue-100 text-sm font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-[#232b3e]/80 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-blue-900 disabled:bg-gray-50 dark:disabled:bg-[#232b3e] disabled:text-gray-400 transition-all duration-200"
                   >
                     {isExporting ? 'Exporting...' : 'Export'}
                   </button>
                 </div>
-                <div className="h-[300px]">
-                  <GenderDistributionChart
-                    genderData={genderData}
-                    totalApplicants={(() => {
-                      if (selectedMonth === 'all') {
-                        // Sum all months
-                        return dashboardData.monthlyData.datasets[1].data.reduce((a, b) => a + b, 0);
-                      } else {
-                        // Single month
-                        return dashboardData.monthlyData.datasets[1].data[parseInt(selectedMonth)] || 0;
-                      }
-                    })()}
-                    femaleNumber={femaleNumber}
-                    maleNumber={maleNumber}
-                    canvasRef={genderCanvasRef}
-                  />
+                <div className="flex flex-col items-center justify-center w-full">
+                  <div className="w-full max-w-[400px] sm:max-w-[440px] md:max-w-[480px] mx-auto bg-white/60 dark:bg-[#232b3e]/70 border border-blue-100 dark:border-blue-900 rounded-2xl p-6 flex flex-col items-center justify-center shadow-lg backdrop-blur-md transition-all duration-200 group-hover:shadow-xl">
+                    <GenderDistributionChart
+                      genderData={genderData}
+                      totalApplicants={(() => {
+                        if (selectedMonth === 'all') {
+                          // Sum all months
+                          return dashboardData.monthlyData.datasets[1].data.reduce((a, b) => a + b, 0);
+                        } else {
+                          // Single month
+                          return dashboardData.monthlyData.datasets[1].data[parseInt(selectedMonth)] || 0;
+                        }
+                      })()}
+                      femaleNumber={femaleNumber}
+                      maleNumber={maleNumber}
+                      canvasRef={genderCanvasRef}
+                    />
+                    <div className="flex flex-row gap-8 mt-6 justify-center w-full">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block w-4 h-4 rounded-full bg-gradient-to-b from-pink-400 to-pink-600 border-2 border-pink-300 shadow-sm"></span>
+                        <span className="text-sm font-bold text-pink-600 dark:text-pink-300 tracking-wide">Female</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block w-4 h-4 rounded-full bg-gradient-to-b from-blue-400 to-blue-600 border-2 border-blue-300 shadow-sm"></span>
+                        <span className="text-sm font-bold text-blue-600 dark:text-blue-300 tracking-wide">Male</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </section>
 
               {/* Educational Attainment */}
-              <section ref={chartRefs.education} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+              <section ref={chartRefs.education} className="bg-white dark:bg-[#181c2a] rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-blue-900 hover:shadow-xl transition-all duration-300">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-600">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-blue-100 flex items-center gap-3">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-200">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                       </span>
                       Educational Background
                     </h2>
-                    <p className="text-sm text-gray-500 mt-2 ml-[52px]">
+                    <p className="text-sm text-gray-500 dark:text-gray-300 mt-2 ml-[52px]">
                       Applicants by Educational Attainment
                     </p>
                   </div>
                   <button
                     onClick={() => handleExportChart('education')}
                     disabled={isExporting}
-                    className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
+                    className="inline-flex items-center px-4 py-2 bg-gray-50 dark:bg-[#232b3e] text-gray-700 dark:text-blue-100 text-sm font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-[#232b3e]/80 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-blue-900 disabled:bg-gray-50 dark:disabled:bg-[#232b3e] disabled:text-gray-400 transition-all duration-200"
                   >
                     {isExporting ? 'Exporting...' : 'Export'}
                   </button>
                 </div>
-                <div className="h-[300px]">
+                <div className="h-[300px] bg-white dark:bg-[#232b3e] rounded-xl p-2">
                   <Pie ref={educationRef} data={dashboardData.educationData} options={pieChartOptions} />
                 </div>
               </section>
 
               {/* Sector Distribution */}
-              <section ref={chartRefs.sector} className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+              <section ref={chartRefs.sector} className="bg-white dark:bg-[#181c2a] rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-blue-900 hover:shadow-xl transition-all duration-300">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 text-blue-600">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-blue-100 flex items-center gap-3">
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-200">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                       </span>
                       Employment Sectors
                     </h2>
-                    <p className="text-sm text-gray-500 mt-2 ml-[52px]">
+                    <p className="text-sm text-gray-500 dark:text-gray-300 mt-2 ml-[52px]">
                       Placed Applicants in Private vs Government Sector
                     </p>
                   </div>
                   <button
                     onClick={() => handleExportChart('sector')}
                     disabled={isExporting}
-                    className="inline-flex items-center px-4 py-2 bg-gray-50 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:bg-gray-50 disabled:text-gray-400 transition-all duration-200"
+                    className="inline-flex items-center px-4 py-2 bg-gray-50 dark:bg-[#232b3e] text-gray-700 dark:text-blue-100 text-sm font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-[#232b3e]/80 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-blue-900 disabled:bg-gray-50 dark:disabled:bg-[#232b3e] disabled:text-gray-400 transition-all duration-200"
                   >
                     {isExporting ? 'Exporting...' : 'Export'}
                   </button>
                 </div>
-                <div className="h-[300px]">
+                <div className="h-[300px] bg-white dark:bg-[#232b3e] rounded-xl p-2">
                   <Pie ref={sectorRef} data={dashboardData.sectorData} options={pieChartOptions} />
                 </div>
               </section>

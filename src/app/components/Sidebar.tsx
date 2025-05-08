@@ -18,12 +18,26 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // Close sidebar on route changes for mobile only
+  // Responsive: close sidebar on route changes for mobile only
   useEffect(() => {
     if (window.innerWidth < 640) {
       setIsOpen(false);
     }
   }, [pathname, setIsOpen]);
+
+  // Prevent body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (isOpen && window.innerWidth < 640) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
   const navigationItems = [
     {
@@ -78,7 +92,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 left-4 z-50 inline-flex items-center p-2 text-sm text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600"
+        className="fixed top-4 left-4 z-[101] inline-flex items-center p-2 text-sm text-gray-500 rounded-full bg-gray/80 shadow-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 transition-all"
+        aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'}
       >
         {isOpen ? <FaTimes className="w-6 h-6" /> : <FaBars className="w-6 h-6" />}
       </button>
@@ -86,16 +101,17 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       {/* Overlay - Show on mobile only when sidebar is open */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-gray-900 bg-opacity-50 z-30 sm:hidden"
+          className="fixed inset-0 bg-gray-900/50 z-50 sm:hidden transition-opacity duration-300"
           onClick={() => setIsOpen(false)}
+          aria-label="Close sidebar overlay"
         />
       )}
 
       {/* Logout Confirmation Modal */}
       {showLogoutConfirm && (
         <>
-          <div className="fixed inset-0 backdrop-blur-sm z-50" onClick={cancelLogout} />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-50 w-96 p-6 border border-gray-200">
+          <div className="fixed inset-0 z-[201] bg-black/30 backdrop-blur-sm" onClick={cancelLogout} />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl z-[202] w-80 max-w-full p-7 border border-gray-200 animate-fade-in">
             <div className="text-center">
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-50 mb-4">
                 <FaSignOutAlt className="h-6 w-6 text-red-600" />
@@ -120,17 +136,32 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               </div>
             </div>
           </div>
+          <style jsx>{`
+            .animate-fade-in {
+              animation: fadeIn 0.3s cubic-bezier(0.4,0,0.2,1);
+            }
+            @keyframes fadeIn {
+              from { opacity: 0; transform: translateY(16px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
         </>
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-40 h-screen transition-all duration-300 ease-in-out ${isOpen ? 'w-64' : 'w-16'
-          }`}
+        className={`fixed left-0 top-0 z-[100] h-screen transition-all duration-300 ease-in-out
+          ${isOpen ? 'w-64' : 'w-16'}
+          bg-gray-900 shadow-xl border-r border-blue-100 dark:border-gray-800
+          flex flex-col
+        `}
+        style={{
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.12)',
+        }}
       >
-        <div className="h-full px-3 py-4 overflow-y-auto bg-gray-900">
+        <div className="h-full flex flex-col px-2 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-800">
           {/* Logo Section */}
-          <div className={`flex items-center justify-center mb-6 mt-12 ${isOpen ? 'px-2' : 'px-0'}`}>
+          <div className={`flex items-center justify-center mb-8 mt-12 ${isOpen ? 'px-2' : 'px-0'}`}>
             <div className={`flex items-center ${isOpen ? 'space-x-3' : 'justify-center'}`}>
               <div className="relative w-10 h-10 flex-shrink-0">
                 <Image
@@ -143,7 +174,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               </div>
               {isOpen && (
                 <div className="flex flex-col">
-                  <span className="text-xl font-semibold text-white">PESO</span>
+                  <span className="text-xl font-semibold text-white tracking-tight">PESO</span>
                   <span className="text-xs text-gray-400">Region X</span>
                 </div>
               )}
@@ -151,56 +182,59 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           </div>
 
           {/* Navigation Menu */}
-          <div className="space-y-2">
+          <nav className="flex-1 space-y-1">
             {navigationItems
               .filter(item => item.roles.includes(role || ""))
               .map((item, index) => {
                 const isActive = pathname === item.href;
+                const isDisabled = false; // You can set this based on your logic
                 return (
                   <Link
                     key={index}
                     href={item.href}
                     onClick={() => window.innerWidth < 640 && setIsOpen(false)}
-                    className={`flex items-center ${isOpen ? 'p-3' : 'p-2 justify-center'
-                      } text-base rounded-lg transition-colors ${isActive
-                        ? 'bg-gray-800 text-white'
-                        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                      } group relative`}
+                    className={`group flex items-center gap-3 rounded-lg px-3 py-2 my-1 font-medium transition-all duration-200 relative
+                      ${isActive
+                        ? 'bg-gray-800 text-blue-300 shadow-sm'
+                        : isDisabled
+                          ? 'text-gray-600 cursor-not-allowed opacity-60'
+                          : 'text-gray-200 hover:bg-gray-800 hover:text-blue-200'}
+                      ${isOpen ? '' : 'justify-center'}
+                    `}
+                    tabIndex={isDisabled ? -1 : 0}
+                    aria-disabled={isDisabled}
                   >
-                    <div className={`transition-colors ${isActive ? 'text-blue-500' : 'text-gray-400 group-hover:text-white'}`}>
-                      {item.icon}
-                    </div>
+                    <span className={`transition-colors ${isActive ? 'text-blue-400' : isDisabled ? 'text-gray-600' : 'text-gray-400 group-hover:text-blue-200'}`}>{item.icon}</span>
                     {isOpen ? (
                       <>
-                        <span className="ml-3 flex-1 whitespace-nowrap">{item.label}</span>
+                        <span className="ml-1 flex-1 whitespace-nowrap text-base">{item.label}</span>
                         {isActive && (
-                          <div className="w-1.5 h-8 bg-blue-500 rounded-full ml-3"></div>
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-blue-500 rounded-full" />
                         )}
                       </>
                     ) : (
-                      <div className="absolute left-full rounded-md px-2 py-1 ml-6 bg-gray-900 text-white text-sm invisible opacity-0 -translate-x-3 transition-all group-hover:visible group-hover:opacity-100 group-hover:translate-x-0">
+                      <span className="absolute left-full rounded-md px-2 py-1 ml-3 bg-gray-800 text-white text-xs shadow-lg invisible opacity-0 -translate-x-3 transition-all group-hover:visible group-hover:opacity-100 group-hover:translate-x-0 pointer-events-none">
                         {item.label}
-                      </div>
+                      </span>
                     )}
                   </Link>
                 );
               })}
-          </div>
+          </nav>
 
-          {/* Update Logout Button onClick */}
-          <div className="pt-4 mt-4 border-t border-gray-700">
+          {/* Logout Button */}
+          <div className="pt-4 mt-4 border-t border-gray-800">
             <button
               onClick={handleLogout}
-              className={`flex items-center ${isOpen ? 'p-3' : 'p-2 justify-center'
-                } w-full text-base text-gray-300 rounded-lg hover:bg-gray-700 hover:text-white transition-colors group relative`}
+              className={`group flex items-center gap-3 w-full rounded-lg px-3 py-2 font-medium text-gray-200 hover:bg-gray-800 hover:text-red-400 transition-all duration-200 relative ${isOpen ? '' : 'justify-center'}`}
             >
-              <FaSignOutAlt className="w-5 h-5 text-gray-400 group-hover:text-white" />
+              <FaSignOutAlt className="w-5 h-5 text-gray-400 group-hover:text-red-400" />
               {isOpen ? (
                 <span className="ml-1 flex-1 whitespace-nowrap">Logout</span>
               ) : (
-                <div className="absolute left-full rounded-md px-2 py-1 ml-6 bg-gray-900 text-white text-sm invisible opacity-0 -translate-x-3 transition-all group-hover:visible group-hover:opacity-100 group-hover:translate-x-0">
+                <span className="absolute left-full rounded-md px-2 py-1 ml-3 bg-gray-800 text-white text-xs shadow-lg invisible opacity-0 -translate-x-3 transition-all group-hover:visible group-hover:opacity-100 group-hover:translate-x-0 pointer-events-none">
                   Logout
-                </div>
+                </span>
               )}
             </button>
           </div>
