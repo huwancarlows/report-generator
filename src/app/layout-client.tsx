@@ -5,6 +5,7 @@ import { useAuth } from "./context/AuthContext";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import Image from "next/image";
+import LoadingOverlay from "./LoadingOverlay";
 
 export default function LayoutClient({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -16,12 +17,9 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
   const isHomePage = pathname === "/";
   const shouldShowSidebar = user && !isLoginPage && !isHomePage;
 
+  // Show overlay spinner if loading
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-      </div>
-    );
+    return <LoadingOverlay show={true} />;
   }
 
   return (
@@ -62,7 +60,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
               <div className="flex items-center space-x-5">
                 <div className="text-right group cursor-pointer transition-all">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
-                    {user?.email}
+                    {user?.name}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-blue-400 transition-colors">
                     {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
@@ -70,7 +68,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
                 </div>
                 <div className="h-11 w-11 rounded-full bg-blue-600 flex items-center justify-center shadow-lg ring-2 ring-blue-300 dark:ring-blue-900 transition-all hover:scale-105 cursor-pointer">
                   <span className="text-white font-bold text-lg select-none">
-                    {user?.email?.charAt(0).toUpperCase()}
+                    {user?.name?.charAt(0).toUpperCase()}
                   </span>
                 </div>
               </div>

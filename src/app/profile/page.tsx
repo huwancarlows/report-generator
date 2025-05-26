@@ -3,68 +3,32 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext"
 import { useRouter } from "next/navigation";
+import LoadingOverlay from "../LoadingOverlay";
 
-function getInitials(email: string) {
-  if (!email) return "?";
-  const [name] = email.split("@");
+function getInitials(name: string) {
+  if (!name) return "?";
   return name
-    .split(/[._-]/)
+    .split(/[._\-\s]/)
     .map((part) => part[0]?.toUpperCase() || "")
     .join("")
     .slice(0, 2);
 }
 
 export default function ProfilePage() {
-  const { user, role } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
-      router.push("/login");
+      window.location.href = "/login";
     } else {
       setLoading(false);
     }
   }, [user, router]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-white to-blue-200 dark:from-[#0a0a0a] dark:via-[#111] dark:to-[#1e293b]">
-        <div className="animate-fade-in bg-white/70 dark:bg-[#18181b]/70 rounded-2xl shadow-xl px-8 py-6 flex flex-col items-center border border-blue-100 dark:border-[#222] backdrop-blur-md">
-          <div className="dual-ring mb-4" />
-          <span className="text-lg font-medium text-blue-700 dark:text-blue-200 tracking-wide">Loading profile...</span>
-        </div>
-        <style jsx>{`
-          .dual-ring {
-            display: inline-block;
-            width: 48px;
-            height: 48px;
-          }
-          .dual-ring:after {
-            content: " ";
-            display: block;
-            width: 36px;
-            height: 36px;
-            margin: 6px;
-            border-radius: 50%;
-            border: 5px solid #2563eb;
-            border-color: #2563eb transparent #60a5fa transparent;
-            animation: dual-ring-spin 1.1s linear infinite;
-          }
-          @keyframes dual-ring-spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-          .animate-fade-in {
-            animation: fadeIn 0.4s;
-          }
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(16px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-        `}</style>
-      </div>
-    );
+    return <LoadingOverlay show={true} />;
   }
 
   if (!user) {
@@ -73,7 +37,7 @@ export default function ProfilePage() {
         <div className="bg-white/80 dark:bg-[#18181b]/80 rounded-2xl shadow-xl px-8 py-6 flex flex-col items-center border border-red-200 dark:border-[#222] backdrop-blur-md animate-fade-in">
           <p className="text-lg font-medium text-red-600 dark:text-red-400 tracking-wide mb-4">Please log in to view your profile.</p>
           <button
-            onClick={() => router.push("/login")}
+            onClick={() => window.location.href = "/login"}
             className="mt-2 px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold rounded-lg transition flex items-center gap-2 shadow-md"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -103,7 +67,7 @@ export default function ProfilePage() {
         {/* User Avatar */}
         <div className="flex flex-col items-center z-10 relative">
           <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 dark:from-blue-700 dark:to-blue-900 flex items-center justify-center text-white text-4xl font-bold shadow-lg mb-4 border-4 border-white dark:border-[#18181b]">
-            {getInitials(user.email)}
+            {getInitials(user.name)}
           </div>
           <h1 className="text-3xl font-extrabold text-center text-gray-900 dark:text-white mb-1 tracking-tight">Profile</h1>
           <p className="text-gray-600 dark:text-gray-300 text-center mb-4 text-base">Your account information and access rights</p>
@@ -125,8 +89,8 @@ export default function ProfilePage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <div>
-              <p className="text-gray-600 dark:text-gray-400 text-sm">Email</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white break-all">{user.email}</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Name</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white break-all">{user.name}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -136,6 +100,24 @@ export default function ProfilePage() {
             <div>
               <p className="text-gray-600 dark:text-gray-400 text-sm">Role</p>
               <p className="text-lg font-semibold text-blue-700 dark:text-blue-300 capitalize">{user.role}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <svg className="w-6 h-6 text-blue-500 dark:text-blue-300" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v4a1 1 0 001 1h3m10-5v4a1 1 0 01-1 1h-3m-4 4h4m-2 0v4m0-4V7" />
+            </svg>
+            <div>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Municipal Mayor</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white break-all">{user.municipal_mayor}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <svg className="w-6 h-6 text-blue-500 dark:text-blue-300" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
+            </svg>
+            <div>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Address</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white break-all">{user.address}</p>
             </div>
           </div>
         </div>

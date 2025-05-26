@@ -30,50 +30,50 @@ export default function AdminPage() {
   const [filterOffice, setFilterOffice] = useState<string>('')
   const [filterPeriod, setFilterPeriod] = useState<string>('')
   const [filterStatus, setFilterStatus] = useState<string>('')
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
     // Check if user is logged in and has admin role
-    const storedUser = JSON.parse(localStorage.getItem("user") || "null");
-    if (!storedUser || storedUser.role !== "admin") {
-      router.replace("/login");
+    if (!authLoading && (!user || user.role !== "admin")) {
+      window.location.href = "/login";
       return;
     }
 
-    const fetchAllReports = async () => {
-      setLoading(true)
-      try {
-        // Get all reports with their entries and user profiles
-        const { data: reports, error: reportsError } = await supabase
-          .from('employment_reports')
-          .select(`
+    if (user && user.role === "admin") {
+      const fetchAllReports = async () => {
+        setLoading(true)
+        try {
+          // Get all reports with their entries and user profiles
+          const { data: reports, error: reportsError } = await supabase
+            .from('employment_reports')
+            .select(`
             *,
             employment_facilitation_entries(*),
             user_profile:profiles(name, municipal_mayor, address)
           `)
-          .order('reporting_period', { ascending: false });
+            .order('reporting_period', { ascending: false });
 
-        if (reportsError) throw reportsError;
+          if (reportsError) throw reportsError;
 
-        if (reports) {
-          // Transform the data to match the expected format
-          const transformedReports = reports.map(report => ({
-            ...report,
-            entries: report.employment_facilitation_entries || [],
-            user_profile: report.user_profile
-          }));
-          setReportData(transformedReports as ReportWithUserInfo[]);
+          if (reports) {
+            // Transform the data to match the expected format
+            const transformedReports = reports.map(report => ({
+              ...report,
+              entries: report.employment_facilitation_entries || [],
+              user_profile: report.user_profile
+            }));
+            setReportData(transformedReports as ReportWithUserInfo[]);
+          }
+        } catch (error) {
+          console.error('Error fetching reports:', error);
+        } finally {
+          setLoading(false);
         }
-      } catch (error) {
-        console.error('Error fetching reports:', error);
-      } finally {
-        setLoading(false);
       }
+      fetchAllReports();
     }
-
-    fetchAllReports()
-  }, [router])
+  }, [user, authLoading, router])
 
   const handleExportPDF = async (reportElement: HTMLElement, index: number) => {
     const filename = `report-${reportData?.[index].reporting_period || 'report'}.pdf`

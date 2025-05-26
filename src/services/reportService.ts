@@ -1,23 +1,23 @@
-import { supabase, handleSupabaseError } from '../lib/supabase';
+import { supabase, handleSupabaseError } from '../app/utils/supabaseClient';
 import { CompleteReport, EmploymentFacilitation, Report, ProgramType, Profile } from '../types/database.types';
 
 export const reportService = {
+  /**
+   * Create a new employment report for the given user.
+   * @param reportingPeriod - The reporting period (e.g., '2024-05')
+   * @param reportingOffice - The reporting office name
+   * @param entries - The employment facilitation entries
+   * @param userId - The user's UUID (profile_id)
+   */
   async createReport(
     reportingPeriod: string,
     reportingOffice: string,
-    entries: Omit<EmploymentFacilitation, 'id' | 'report_id' | 'created_at' | 'updated_at'>[]
+    entries: Omit<EmploymentFacilitation, 'id' | 'report_id' | 'created_at' | 'updated_at'>[],
+    userId: string
   ): Promise<CompleteReport | null> {
     try {
-      // Get user from localStorage
-      const storedUser = localStorage.getItem("user");
-      if (!storedUser) {
+      if (!userId) {
         console.error('No authenticated user found');
-        return null;
-      }
-
-      const user = JSON.parse(storedUser);
-      if (!user?.id) {
-        console.error('Invalid user data');
         return null;
       }
 
@@ -45,7 +45,7 @@ export const reportService = {
           current_female_count: entry.current_female_count,
           remarks: entry.remarks,
         })),
-        profile_id: user.id
+        profile_id: userId
       });
 
       if (rpcError) {
@@ -61,7 +61,6 @@ export const reportService = {
           employment_facilitation_entries (*),
           profile:profiles (
             id,
-            email,
             role,
             name,
             municipal_mayor,
@@ -70,7 +69,7 @@ export const reportService = {
         `)
         .eq("reporting_period", reportingPeriod)
         .eq("reporting_office", reportingOffice)
-        .eq("profile_id", user.id)
+        .eq("profile_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -116,7 +115,6 @@ export const reportService = {
           employment_facilitation_entries (*),
           profile:profiles (
             id,
-            email,
             role,
             name,
             municipal_mayor,
@@ -139,18 +137,15 @@ export const reportService = {
     }
   },
 
-  async getUserReports(): Promise<CompleteReport[]> {
+  /**
+   * Get all reports for a user by userId (UUID)
+   * @param userId - The user's UUID (profile_id)
+   */
+  async getUserReports(userId: string): Promise<CompleteReport[]> {
     try {
-      const storedUser = localStorage.getItem("user");
-      if (!storedUser) {
+      if (!userId) {
         console.error('No authenticated user found');
         throw new Error('No authenticated user found');
-      }
-
-      const user = JSON.parse(storedUser);
-      if (!user?.id) {
-        console.error('Invalid user data');
-        throw new Error('Invalid user data');
       }
 
       const { data: reports, error: reportsError } = await supabase
@@ -160,15 +155,17 @@ export const reportService = {
           employment_facilitation_entries (*),
           profile:profiles (
             id,
-            email,
             role,
             name,
             municipal_mayor,
             address
           )
         `)
-        .eq('profile_id', user.id)
+        .eq('profile_id', userId)
         .order('created_at', { ascending: false });
+
+      // Debug log
+      console.log('Fetching reports for userId:', userId, 'Error:', reportsError, 'Data:', reports);
 
       if (reportsError) {
         console.error('Error fetching reports:', reportsError);
@@ -227,7 +224,13 @@ export const reportService = {
     }
   },
 
-  async getPreviousReport(reportingPeriod: string, reportingOffice: string, profileId: number) {
+  /**
+   * Get the previous report for a user by userId (UUID)
+   * @param reportingPeriod - The reporting period (e.g., '2024-05')
+   * @param reportingOffice - The reporting office name
+   * @param userId - The user's UUID (profile_id)
+   */
+  async getPreviousReport(reportingPeriod: string, reportingOffice: string, userId: string) {
     // Query for the most recent report before the given period for the office and user
     // (Assume reportingPeriod is in YYYY-MM format)
     const { data, error } = await supabase
@@ -247,7 +250,7 @@ export const reportService = {
         )
       `)
       .eq("reporting_office", reportingOffice)
-      .eq("profile_id", profileId)
+      .eq("profile_id", userId)
       .lt("reporting_period", reportingPeriod)
       .order("reporting_period", { ascending: false })
       .limit(1)

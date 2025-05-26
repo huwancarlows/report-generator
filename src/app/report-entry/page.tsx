@@ -69,46 +69,27 @@ export default function ReportEntryPage() {
   const [loading, setLoading] = useState<boolean>(true)
   const [exportingReport, setExportingReport] = useState<boolean>(false)
   const [exportingSummary, setExportingSummary] = useState<boolean>(false)
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [selectedReportIndex, setSelectedReportIndex] = useState<number>(0)
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const router = useRouter()
 
+  // Use user context for profile info
+  const userProfile = user ? {
+    name: user.name,
+    municipal_mayor: user.municipal_mayor,
+    address: user.address
+  } : null;
+
   useEffect(() => {
-    // Check if user is logged in and has user role only
-    const storedUser = JSON.parse(localStorage.getItem("user") || "null");
-    if (!storedUser || storedUser.role !== "user") {
+    if (!authLoading) {
+      if (!user || user.role !== "user") {
       router.replace("/login");
       return;
     }
-
-    const fetchUserProfile = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('name, municipal_mayor, address')
-          .eq('email', user?.email)
-          .single();
-
-        if (error) {
-          console.error('Error fetching user profile:', error);
-          toast.error('Failed to fetch user profile');
-          return;
-        }
-
-        if (data) {
-          setUserProfile(data);
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        toast.error('An error occurred while fetching user profile');
-      }
-    };
-
     const fetchReports = async () => {
       setLoading(true);
       try {
-        const data = await reportService.getUserReports();
+          const data = await reportService.getUserReports(user.id);
         if (data && data.length > 0) {
           // Sort reports by reporting period in descending order
           const sortedReports = data.sort((a, b) =>
@@ -126,13 +107,9 @@ export default function ReportEntryPage() {
         setLoading(false);
       }
     };
-
-    // Fetch data in parallel
-    Promise.all([fetchUserProfile(), fetchReports()]).catch(error => {
-      console.error('Error in parallel data fetching:', error);
-      toast.error('An error occurred while fetching data');
-    });
-  }, [router, user?.email]);
+      fetchReports();
+    }
+  }, [router, user, authLoading]);
 
   const handleExportPDF = async (reportElement: HTMLElement, index: number) => {
     try {

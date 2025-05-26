@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../utils/supabaseClient";
 import { useAuth } from "../context/AuthContext";
 import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -16,62 +15,49 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isBLE, setIsBLE] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [loginAttempted, setLoginAttempted] = useState(false);
+
+  // Track login success and redirect after user is set
+  useEffect(() => {
+    if (loginAttempted && user && !authLoading && showSuccess) {
+      const timeout = setTimeout(() => {
+        // Role-based redirect after login
+        if (isBLE && user.role !== "admin") {
+          setError("Access denied. BLE login is only for administrators.");
+          setShowSuccess(false);
+          setLoginAttempted(false);
+          return;
+        }
+        if (!isBLE && user.role !== "user") {
+          setError("Access denied. PESO login is only for PESO users.");
+          setShowSuccess(false);
+          setLoginAttempted(false);
+          return;
+        }
+        if (user.role === "admin") {
+          window.location.href = "/admin?justLoggedIn=true";
+        } else {
+          window.location.href = "/dashboard?justLoggedIn=true";
+        }
+        setLoginAttempted(false);
+      }, 2000); // 2 seconds for modal visibility
+      return () => clearTimeout(timeout);
+    }
+  }, [showSuccess, user, authLoading, isBLE, router, loginAttempted]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setShowSuccess(false);
+    setLoginAttempted(false);
 
     try {
-      const { data, error: loginError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("email", email)
-        .eq("password", password)
-        .single();
-
-      if (loginError || !data) {
-        setError("Invalid credentials. Please try again.");
-        return;
-      }
-
-      // Check role-based access
-      if (isBLE && data.role !== "admin") {
-        setError("Access denied. BLE login is only for administrators.");
-        setLoading(false);
-        return;
-      }
-
-      if (!isBLE && data.role !== "user") {
-        setError("Access denied. PESO login is only for PESO users.");
-        setLoading(false);
-        return;
-      }
-
-      const userData = {
-        id: data.id,
-        email: data.email,
-        role: data.role,
-        name: data.name,
-        municipal_mayor: data.municipal_mayor,
-        address: data.address
-      };
-
-      login(userData);
-      setShowSuccess(true);
-
-      // Delay redirect to show success message
-      setTimeout(() => {
-        if (data.role === "admin") {
-          router.push("/admin");
-        } else {
-          router.push("/dashboard");
-        }
-      }, 1500);
-
-    } catch (err) {
-      setError("An error occurred during login. Please try again.");
+      await login(email, password);
+      setShowSuccess(true); // Only set this after successful login
+      setLoginAttempted(true);
+    } catch (err: any) {
+      setError(err.message || "An error occurred during login. Please try again.");
       console.error("Login error:", err);
     } finally {
       setLoading(false);
@@ -84,6 +70,23 @@ export default function LoginPage() {
     setEmail("");
     setPassword("");
   };
+
+  // If showSuccess, show only the modal (no form, no spinner)
+  if (showSuccess) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl px-8 py-8 max-w-xs w-full flex flex-col items-center animate-fade-scale-in border border-green-200">
+          <div className="flex items-center justify-center w-14 h-14 rounded-full bg-green-100 mb-4">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-green-700 mb-1">Login Successful!</h3>
+          <p className="text-sm text-gray-600 text-center mb-1">Redirecting to your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${isBLE
@@ -230,7 +233,7 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || authLoading}
                 className={`w-full py-3 px-4 ${isBLE
                   ? 'bg-purple-600 hover:bg-purple-700 focus:ring-purple-500'
                   : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
@@ -258,21 +261,6 @@ export default function LoginPage() {
           <p className="mt-1">© {new Date().getFullYear()} {isBLE ? 'BLE' : 'PESO'}. All rights reserved.</p>
         </div>
       </div>
-
-      {/* Success Modal Overlay */}
-      {showSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl px-8 py-8 max-w-xs w-full flex flex-col items-center animate-fade-scale-in border border-green-200">
-            <div className="flex items-center justify-center w-14 h-14 rounded-full bg-green-100 mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-bold text-green-700 mb-1">Login Successful!</h3>
-            <p className="text-sm text-gray-600 text-center mb-1">Redirecting to your dashboard...</p>
-          </div>
-        </div>
-      )}
 
       {/* Add styles for background pattern and animations */}
       <style jsx>{`

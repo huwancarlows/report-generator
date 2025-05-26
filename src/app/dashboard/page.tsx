@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback, createRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement } from 'chart.js';
 import { Bar, Pie, Line, Chart } from 'react-chartjs-2';
 import { exportToImage } from '@/utils/exportUtils';
 import { getDashboardData } from '@/data/mockDashboardData';
 import type { Metadata } from "next";
+import { useAuth } from '../context/AuthContext';
+import LoadingOverlay from "../LoadingOverlay";
 
 // Register ChartJS components
 ChartJS.register(
@@ -243,7 +245,8 @@ const GenderDistributionChart = ({ genderData, totalApplicants, femaleNumber, ma
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const searchParams = useSearchParams();
+  const { user, loading } = useAuth();
   const [isExporting, setIsExporting] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('2024');
   const [selectedMonth, setSelectedMonth] = useState('all');
@@ -265,170 +268,134 @@ export default function DashboardPage() {
   };
   const [monthGroup, setMonthGroup] = useState(0); // 0: Jan–Apr, 1: May–Aug, 2: Sep–Dec
   const genderCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [showLoginSuccess, setShowLoginSuccess] = useState(false);
+
+  // Show login success modal if justLoggedIn param is present
+  useEffect(() => {
+    if (searchParams.get("justLoggedIn") === "true") {
+      setShowLoginSuccess(true);
+      // Remove the param from the URL after showing the modal
+      setTimeout(() => {
+        setShowLoginSuccess(false);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("justLoggedIn");
+        window.history.replaceState({}, document.title, url.pathname + url.search);
+      }, 2000);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem("user") || "null");
-    if (!storedUser || !["admin", "user"].includes(storedUser.role)) {
-      router.replace("/login");
-    } else {
-      setUser(storedUser);
+    if (!loading && (!user || !["admin", "user"].includes(user.role))) {
+      window.location.href = "/login";
     }
-  }, [router]);
+  }, [user, loading, router]);
 
   useEffect(() => {
     if (user) {
       // Get data based on user role
       const rawData = getDashboardData(selectedPeriod);
 
-      if (user.role === 'user') {
-        // Filter data for specific user
-        let filteredData = {
-          ...rawData,
+      // Use a fixed multiplier for all users (since id is now a UUID string)
+      // For demo: admins see all data, users see 12% of data
+      const userMultiplier = user.role === 'admin' ? 1 : 0.12;
+
+      let filteredData = {
+        ...rawData,
+        monthlyData: {
+          ...rawData.monthlyData,
+          datasets: rawData.monthlyData.datasets.map(dataset => ({
+            ...dataset,
+            data: dataset.data.map(value => Math.round(value * userMultiplier))
+          }))
+        },
+        topJobsData: {
+          ...rawData.topJobsData,
+          datasets: [{
+            ...rawData.topJobsData.datasets[0],
+            data: rawData.topJobsData.datasets[0].data.map(value => Math.round(value * userMultiplier))
+          }]
+        },
+        genderData: {
+          ...rawData.genderData,
+          datasets: [{
+            ...rawData.genderData.datasets[0],
+            data: selectedMonth === 'all'
+              ? rawData.genderData.datasets[0].data
+              : [rawData.monthlyGenderData[parseInt(selectedMonth)].male, rawData.monthlyGenderData[parseInt(selectedMonth)].female]
+          }]
+        },
+        monthlyGenderData: rawData.monthlyGenderData,
+        educationData: {
+          ...rawData.educationData,
+          datasets: [{
+            ...rawData.educationData.datasets[0],
+            data: rawData.educationData.datasets[0].data
+          }]
+        },
+        sectorData: {
+          ...rawData.sectorData,
+          datasets: [{
+            ...rawData.sectorData.datasets[0],
+            data: rawData.sectorData.datasets[0].data
+          }]
+        },
+        quickStats: {
+          solicitedVacancies: {
+            value: Math.round(rawData.quickStats.solicitedVacancies.value * userMultiplier),
+            change: rawData.quickStats.solicitedVacancies.change
+          },
+          registeredApplicants: {
+            value: Math.round(rawData.quickStats.registeredApplicants.value * userMultiplier),
+            change: rawData.quickStats.registeredApplicants.change
+          },
+          referredApplicants: {
+            value: Math.round(rawData.quickStats.referredApplicants.value * userMultiplier),
+            change: rawData.quickStats.referredApplicants.change
+          },
+          placedApplicants: {
+            value: Math.round(rawData.quickStats.placedApplicants.value * userMultiplier),
+            change: rawData.quickStats.placedApplicants.change
+          }
+        }
+      };
+
+      // Filter by month if a specific month is selected
+      if (selectedMonth !== 'all') {
+        const monthIndex = parseInt(selectedMonth);
+        filteredData = {
+          ...filteredData,
           monthlyData: {
-            ...rawData.monthlyData,
-            datasets: rawData.monthlyData.datasets.map(dataset => ({
+            ...filteredData.monthlyData,
+            labels: [filteredData.monthlyData.labels[monthIndex]],
+            datasets: filteredData.monthlyData.datasets.map(dataset => ({
               ...dataset,
-              data: dataset.data.map(value =>
-                Math.round(value * (user.id % 3 === 0 ? 0.15 : user.id % 2 === 0 ? 0.12 : 0.10))
-              )
+              data: [dataset.data[monthIndex]]
             }))
-          },
-          topJobsData: {
-            ...rawData.topJobsData,
-            datasets: [{
-              ...rawData.topJobsData.datasets[0],
-              data: rawData.topJobsData.datasets[0].data.map(value =>
-                Math.round(value * (user.id % 3 === 0 ? 0.15 : user.id % 2 === 0 ? 0.12 : 0.10))
-              )
-            }]
-          },
-          genderData: {
-            ...rawData.genderData,
-            datasets: [{
-              ...rawData.genderData.datasets[0],
-              data: selectedMonth === 'all'
-                ? rawData.genderData.datasets[0].data
-                : [rawData.monthlyGenderData[parseInt(selectedMonth)].male, rawData.monthlyGenderData[parseInt(selectedMonth)].female]
-            }]
-          },
-          monthlyGenderData: rawData.monthlyGenderData,
-          educationData: {
-            ...rawData.educationData,
-            datasets: [{
-              ...rawData.educationData.datasets[0],
-              data: rawData.educationData.datasets[0].data
-            }]
-          },
-          sectorData: {
-            ...rawData.sectorData,
-            datasets: [{
-              ...rawData.sectorData.datasets[0],
-              data: rawData.sectorData.datasets[0].data
-            }]
           },
           quickStats: {
             solicitedVacancies: {
-              value: Math.round(rawData.quickStats.solicitedVacancies.value * 0.12),
-              change: rawData.quickStats.solicitedVacancies.change
+              value: Math.round(filteredData.monthlyData.datasets[0].data[0]),
+              change: filteredData.quickStats.solicitedVacancies.change
             },
             registeredApplicants: {
-              value: Math.round(rawData.quickStats.registeredApplicants.value * 0.12),
-              change: rawData.quickStats.registeredApplicants.change
+              value: Math.round(filteredData.monthlyData.datasets[1].data[0]),
+              change: filteredData.quickStats.registeredApplicants.change
             },
             referredApplicants: {
-              value: Math.round(rawData.quickStats.referredApplicants.value * 0.12),
-              change: rawData.quickStats.referredApplicants.change
+              value: Math.round(filteredData.monthlyData.datasets[2].data[0]),
+              change: filteredData.quickStats.referredApplicants.change
             },
             placedApplicants: {
-              value: Math.round(rawData.quickStats.placedApplicants.value * 0.12),
-              change: rawData.quickStats.placedApplicants.change
+              value: Math.round(filteredData.monthlyData.datasets[3].data[0]),
+              change: filteredData.quickStats.placedApplicants.change
             }
           }
         };
-
-        // Filter by month if a specific month is selected
-        if (selectedMonth !== 'all') {
-          const monthIndex = parseInt(selectedMonth);
-          filteredData = {
-            ...filteredData,
-            monthlyData: {
-              ...filteredData.monthlyData,
-              labels: [filteredData.monthlyData.labels[monthIndex]],
-              datasets: filteredData.monthlyData.datasets.map(dataset => ({
-                ...dataset,
-                data: [dataset.data[monthIndex]]
-              }))
-            },
-            quickStats: {
-              solicitedVacancies: {
-                value: Math.round(filteredData.monthlyData.datasets[0].data[monthIndex]),
-                change: filteredData.quickStats.solicitedVacancies.change
-              },
-              registeredApplicants: {
-                value: Math.round(filteredData.monthlyData.datasets[1].data[monthIndex]),
-                change: filteredData.quickStats.registeredApplicants.change
-              },
-              referredApplicants: {
-                value: Math.round(filteredData.monthlyData.datasets[2].data[monthIndex]),
-                change: filteredData.quickStats.referredApplicants.change
-              },
-              placedApplicants: {
-                value: Math.round(filteredData.monthlyData.datasets[3].data[monthIndex]),
-                change: filteredData.quickStats.placedApplicants.change
-              }
-            }
-          };
-        }
-
-        setDashboardData(filteredData);
-      } else {
-        // Admin sees all data
-        let adminData = { ...rawData };
-
-        // Filter by month if a specific month is selected
-        if (selectedMonth !== 'all') {
-          const monthIndex = parseInt(selectedMonth);
-          adminData = {
-            ...adminData,
-            monthlyData: {
-              ...adminData.monthlyData,
-              labels: [adminData.monthlyData.labels[monthIndex]],
-              datasets: adminData.monthlyData.datasets.map(dataset => ({
-                ...dataset,
-                data: [dataset.data[monthIndex]]
-              }))
-            },
-            genderData: {
-              ...adminData.genderData,
-              datasets: [{
-                ...adminData.genderData.datasets[0],
-                data: [adminData.monthlyGenderData[monthIndex].male, adminData.monthlyGenderData[monthIndex].female]
-              }]
-            },
-            quickStats: {
-              solicitedVacancies: {
-                value: Math.round(adminData.monthlyData.datasets[0].data[monthIndex]),
-                change: adminData.quickStats.solicitedVacancies.change
-              },
-              registeredApplicants: {
-                value: Math.round(adminData.monthlyData.datasets[1].data[monthIndex]),
-                change: adminData.quickStats.registeredApplicants.change
-              },
-              referredApplicants: {
-                value: Math.round(adminData.monthlyData.datasets[2].data[monthIndex]),
-                change: adminData.quickStats.referredApplicants.change
-              },
-              placedApplicants: {
-                value: Math.round(adminData.monthlyData.datasets[3].data[monthIndex]),
-                change: adminData.quickStats.placedApplicants.change
-              }
-            }
-          };
-        }
-        setDashboardData(adminData);
       }
+
+      setDashboardData(filteredData);
     }
-  }, [selectedPeriod, selectedMonth, user]);
+  }, [selectedPeriod, selectedMonth, user, loading]);
 
   const handleExportDashboard = async () => {
     setIsExporting(true);
@@ -716,8 +683,25 @@ export default function DashboardPage() {
     },
   };
 
+  if (loading) {
+    return <LoadingOverlay show={true} />;
+  }
+
   return (
     <>
+      {showLoginSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl px-8 py-8 max-w-xs w-full flex flex-col items-center animate-fade-scale-in border border-green-200">
+            <div className="flex items-center justify-center w-14 h-14 rounded-full bg-green-100 mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-green-700 mb-1">Login Successful!</h3>
+            <p className="text-sm text-gray-600 text-center mb-1">Redirecting to your dashboard...</p>
+          </div>
+        </div>
+      )}
       {/* Visible dashboard */}
       <div ref={dashboardRef} className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-[#101624] dark:to-[#181c2a]">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">

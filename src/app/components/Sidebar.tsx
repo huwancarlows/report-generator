@@ -5,8 +5,10 @@ import Image from "next/image";
 import { useAuth } from "../context/AuthContext";
 import { FaTachometerAlt, FaFileAlt, FaUser, FaUsersCog, FaSignOutAlt, FaBars, FaTimes, FaClipboardList, FaFolder } from "react-icons/fa";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Dispatch, SetStateAction } from "react";
+import { toast } from 'react-hot-toast';
+import LoadingOverlay from "../LoadingOverlay";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -14,9 +16,15 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
-  const { role, logout } = useAuth();
+  const { user, logout } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [sidebarLoaded, setSidebarLoaded] = useState(false);
+
+  useEffect(() => {
+    setSidebarLoaded(true);
+  }, []);
 
   // Responsive: close sidebar on route changes for mobile only
   useEffect(() => {
@@ -76,10 +84,16 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     setShowLogoutConfirm(true);
   };
 
-  const confirmLogout = () => {
-    logout();
+  const confirmLogout = async () => {
+    const success = await logout();
     setIsOpen(false);
     setShowLogoutConfirm(false);
+    if (success) {
+      toast.success('Logged out successfully!');
+      window.location.href = '/login';
+    } else {
+      toast.error('Failed to log out.');
+    }
   };
 
   const cancelLogout = () => {
@@ -88,6 +102,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
   return (
     <>
+      {/* Overlay spinner for sidebar loading */}
+      {(!user || user === null) && <LoadingOverlay show={true} />}
       {/* Toggle Button */}
       <button
         type="button"
@@ -152,18 +168,19 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       <aside
         className={`fixed left-0 top-0 z-[100] h-screen transition-all duration-300 ease-in-out
           ${isOpen ? 'w-64' : 'w-16'}
-          bg-gray-900 shadow-xl border-r border-blue-100 dark:border-gray-800
+          bg-gradient-to-b from-gray-900 via-gray-950 to-blue-950 shadow-2xl border-r border-blue-200 dark:border-gray-800
           flex flex-col
+          ${sidebarLoaded ? 'animate-sidebar-fade-in' : ''}
         `}
         style={{
           boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.12)',
         }}
       >
-        <div className="h-full flex flex-col px-2 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-800">
+        <div className={`h-full flex flex-col px-2 py-4 overflow-y-hidden scrollbar-none scrollbar-thumb-gray-800 ${isOpen ? '' : 'items-center justify-center px-0 py-0'}`}>
           {/* Logo Section */}
-          <div className={`flex items-center justify-center mb-8 mt-12 ${isOpen ? 'px-2' : 'px-0'}`}>
-            <div className={`flex items-center ${isOpen ? 'space-x-3' : 'justify-center'}`}>
-              <div className="relative w-10 h-10 flex-shrink-0">
+          <div className={`flex flex-col items-center justify-center ${isOpen ? 'mb-10 mt-12 px-2' : 'mb-4 mt-4 px-0'} w-full`} style={{ minHeight: isOpen ? 'auto' : '72px' }}>
+            <div className="flex flex-col items-center w-full">
+              <div className="relative w-12 h-12 flex-shrink-0 mb-2">
                 <Image
                   src="/images/dole-logo.png"
                   alt="DOLE Logo"
@@ -173,9 +190,10 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 />
               </div>
               {isOpen && (
-                <div className="flex flex-col">
-                  <span className="text-xl font-semibold text-white tracking-tight">PESO</span>
-                  <span className="text-xs text-gray-400">Region X</span>
+                <div className="flex flex-col items-center w-full">
+                  <span className="text-2xl font-bold text-white tracking-tight leading-tight">PESO</span>
+                  <span className="text-xs text-blue-200 font-medium tracking-wide mt-0.5">Region X</span>
+                  <span className="text-[11px] text-gray-400 font-normal mt-0.5">Public Employment Service Office</span>
                 </div>
               )}
             </div>
@@ -184,40 +202,49 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           {/* Navigation Menu */}
           <nav className="flex-1 space-y-1">
             {navigationItems
-              .filter(item => item.roles.includes(role || ""))
+              .filter(item => item.roles.includes(user?.role || ""))
               .map((item, index) => {
                 const isActive = pathname === item.href;
-                const isDisabled = false; // You can set this based on your logic
+                const isDisabled = !user || user === null;
                 return (
-                  <Link
+                  <button
                     key={index}
-                    href={item.href}
-                    onClick={() => window.innerWidth < 640 && setIsOpen(false)}
-                    className={`group flex items-center gap-3 rounded-lg px-3 py-2 my-1 font-medium transition-all duration-200 relative
+                    type="button"
+                    onClick={() => {
+                      if (isDisabled) return;
+                      if (window.innerWidth < 640) setIsOpen(false);
+                      router.push(item.href);
+                      router.refresh();
+                    }}
+                    className={`group flex items-center ${isOpen ? 'gap-3 px-5 py-2 my-2' : 'justify-center px-0 py-3 my-1'} rounded-lg font-medium transition-all duration-200 relative
                       ${isActive
-                        ? 'bg-gray-800 text-blue-300 shadow-sm'
+                        ? 'bg-gradient-to-r from-blue-700/80 to-blue-600/60 text-white shadow-md'
                         : isDisabled
                           ? 'text-gray-600 cursor-not-allowed opacity-60'
-                          : 'text-gray-200 hover:bg-gray-800 hover:text-blue-200'}
-                      ${isOpen ? '' : 'justify-center'}
+                          : 'text-gray-200 hover:bg-blue-800/60 hover:text-white'}
+                      focus:outline-none focus:ring-2 focus:ring-blue-400
                     `}
+                    style={{
+                      borderLeft: isActive ? '4px solid #3b82f6' : '4px solid transparent',
+                      boxShadow: isActive ? '0 2px 8px 0 rgba(59,130,246,0.08)' : undefined,
+                      width: isOpen ? '100%' : '48px',
+                      minHeight: isOpen ? undefined : '48px',
+                    }}
                     tabIndex={isDisabled ? -1 : 0}
                     aria-disabled={isDisabled}
+                    disabled={isDisabled}
+                    title={!isOpen ? item.label : undefined}
                   >
-                    <span className={`transition-colors ${isActive ? 'text-blue-400' : isDisabled ? 'text-gray-600' : 'text-gray-400 group-hover:text-blue-200'}`}>{item.icon}</span>
-                    {isOpen ? (
+                    <span className={`transition-colors ${isActive ? 'text-blue-200' : isDisabled ? 'text-gray-600' : 'text-blue-300 group-hover:text-white'}`}>{item.icon}</span>
+                    {isOpen && (
                       <>
                         <span className="ml-1 flex-1 whitespace-nowrap text-base">{item.label}</span>
                         {isActive && (
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-blue-500 rounded-full" />
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-blue-400 rounded-full" />
                         )}
                       </>
-                    ) : (
-                      <span className="absolute left-full rounded-md px-2 py-1 ml-3 bg-gray-800 text-white text-xs shadow-lg invisible opacity-0 -translate-x-3 transition-all group-hover:visible group-hover:opacity-100 group-hover:translate-x-0 pointer-events-none">
-                        {item.label}
-                      </span>
                     )}
-                  </Link>
+                  </button>
                 );
               })}
           </nav>
@@ -227,6 +254,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             <button
               onClick={handleLogout}
               className={`group flex items-center gap-3 w-full rounded-lg px-3 py-2 font-medium text-gray-200 hover:bg-gray-800 hover:text-red-400 transition-all duration-200 relative ${isOpen ? '' : 'justify-center'}`}
+              disabled={!user || user === null}
             >
               <FaSignOutAlt className="w-5 h-5 text-gray-400 group-hover:text-red-400" />
               {isOpen ? (
@@ -239,6 +267,15 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             </button>
           </div>
         </div>
+        <style jsx>{`
+          .animate-sidebar-fade-in {
+            animation: sidebarFadeIn 0.5s cubic-bezier(0.4,0,0.2,1);
+          }
+          @keyframes sidebarFadeIn {
+            from { opacity: 0; transform: translateX(-32px); }
+            to { opacity: 1; transform: translateX(0); }
+          }
+        `}</style>
       </aside>
     </>
   );

@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { reportService } from '@/services/reportService';
+import { profileService } from '@/services/profileService';
 import { toast } from 'react-hot-toast';
 import { ProgramType, EmploymentFacilitation, EmploymentFacilitationRow } from "@/types/database.types";
 import { programOptions, indicatorOptions, subIndicatorOptions } from "@/constants/indicatorOptions";
@@ -16,11 +17,17 @@ import {
 } from '@/types/report.types';
 
 import QuickAddModal, { QuickAddData } from './QuickAddModal';
+import AvailableJobsModal, { TopJob } from './modals/AvailableJobsModal';
+import GenderDistributionModal from './modals/GenderDistributionModal';
+import EmploymentSectorsModal from './modals/EmploymentSectorsModal';
+import LoadingOverlay from "../LoadingOverlay";
 
 interface ReportData {
   employmentFacilitation: EmploymentFacilitationRow[];
   reportingPeriod: string;
   reportingOffice: string;
+  mayor: string;
+  name: string;
 }
 
 // Utility to generate all possible rows
@@ -155,13 +162,13 @@ function getApplicantsRegisteredSubIndicatorKey(indicator: string) {
 }
 
 export default function ReportPage() {
-  const { user } = useAuth();
+  const { user, loading, refreshUser } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   // Initial form state
   const initialFormState: ReportData = {
     employmentFacilitation: [
-
       {
         program: "JOB_VACANCIES" as ProgramType,
         indicator: "REGULAR_PROGRAM",
@@ -175,10 +182,11 @@ export default function ReportPage() {
       }
     ],
     reportingPeriod: "",
-    reportingOffice: ""
+    reportingOffice: "",
+    mayor: "",
+    name: ""
   };
 
-  const [loading, setLoading] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
@@ -187,29 +195,39 @@ export default function ReportPage() {
   const [formData, setFormData] = useState<ReportData>(initialFormState);
   const [showQuickAddModal, setShowQuickAddModal] = useState(false);
   const [quickAddData, setQuickAddData] = useState<QuickAddData | null>(null);
+  const [showAvailableJobs, setShowAvailableJobs] = useState(false);
+  const [showGenderDistribution, setShowGenderDistribution] = useState(false);
+  const [showEmploymentSectors, setShowEmploymentSectors] = useState(false);
 
-  // Reset form to initial state
-  const resetForm = () => {
-    setFormData(initialFormState);
+  const [availableJobs, setAvailableJobs] = useState<TopJob[]>([]);
+  const [genderDistribution, setGenderDistribution] = useState<{ male: string; female: string }>({ male: '', female: '' });
+  const [employmentSectors, setEmploymentSectors] = useState<{ government: string; private: string; overseas: string }>({ government: '', private: '', overseas: '' });
+
+  // Reset all relevant state on mount or when the route changes
+  useEffect(() => {
+    setIsSubmitting(false);
+    setSubmitSuccess(false);
     setValidationErrors({});
     setShowValidationErrors(false);
     setSubmitError(null);
-  };
+    setFormData(initialFormState);
+  }, [pathname]);
 
   useEffect(() => {
-    // Check if user is logged in and has user role only
-    const storedUser = JSON.parse(localStorage.getItem("user") || "null");
-    if (!storedUser || storedUser.role !== "user") {
-      router.replace("/login");
-      return;
+    if (!loading) {
+      if (!user || user.role !== "user") {
+        window.location.href = "/login";
+        return;
+      }
+      // Set the reporting office and mayor from user's address and municipal_mayor
+      setFormData(prev => ({
+        ...prev,
+        reportingOffice: user.address || "",
+        mayor: user.municipal_mayor || "",
+        name: user.name || ""
+      }));
     }
-
-    // Set the reporting office from user's address
-    setFormData(prev => ({
-      ...prev,
-      reportingOffice: storedUser.address || ""
-    }));
-  }, [router]);
+  }, [user, loading, router]);
 
   // Always initialize all possible rows when reporting period or office changes
   useEffect(() => {
@@ -270,7 +288,6 @@ export default function ReportPage() {
     setSubmitError(null);
     setSubmitSuccess(false);
     setIsSubmitting(true);
-    setLoading(true);
 
     try {
       // Process and structure the employment facilitation data
@@ -430,17 +447,19 @@ export default function ReportPage() {
       });
 
       // Call the report service to create the report
+      if (!user) throw new Error('User not authenticated');
       const result = await reportService.createReport(
         formData.reportingPeriod || new Date().toISOString().slice(0, 7),
         formData.reportingOffice || 'Default Office',
-        processedEntries
+        processedEntries,
+        user.id // Pass userId as UUID
       );
 
       if (result) {
         setSubmitSuccess(true);
         toast.success('Report submitted successfully!');
         // Reset form after successful submission
-        resetForm();
+        setFormData(initialFormState);
       } else {
         throw new Error('Failed to create report. Please try again.');
       }
@@ -450,7 +469,6 @@ export default function ReportPage() {
       setSubmitError(errorMessage);
       toast.error(errorMessage);
     } finally {
-      setLoading(false);
       setIsSubmitting(false);
     }
   };
@@ -636,6 +654,44 @@ export default function ReportPage() {
     }));
   }
 
+  // Add debounce utility
+  const debounce = (func: (...args: any[]) => void, delay: number) => {
+    let timer: NodeJS.Timeout;
+    return (...args: any[]) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => func(...args), delay);
+    };
+  };
+
+  // In the Name input
+  const debouncedUpdateName = debounce(async (newName: string) => {
+    if (user && newName !== user.name) {
+      try {
+        const success = await profileService.updateName(user.id, newName);
+        if (success && refreshUser) await refreshUser();
+      } catch (err) {
+        // Optionally handle error
+      }
+    }
+  }, 600);
+
+  // In the Mayor input
+  const debouncedUpdateMayor = debounce(async (newMayor: string) => {
+    if (user && newMayor !== user.municipal_mayor) {
+      try {
+        const success = await profileService.updateMayor(user.id, newMayor);
+        if (success && refreshUser) await refreshUser();
+      } catch (err) {
+        // Optionally handle error
+      }
+    }
+  }, 600);
+
+  // Centralized loading spinner using AuthContext's loading
+  if (loading) {
+    return <LoadingOverlay show={true} />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-8">
       <div className="max-w-[1400px] mx-auto px-4">
@@ -673,6 +729,29 @@ export default function ReportPage() {
                   {validationErrors.reportingPeriod}
                 </p>
               )}
+              {/* Name input */}
+              <label className="block text-sm font-medium text-gray-700 mb-1 mt-4">
+                <span className="flex items-center gap-2">
+                  {/* User icon for Name */}
+                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Name
+                </span>
+              </label>
+              <input
+                type="text"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                value={formData.name || ''}
+                onChange={e => {
+                  const newName = e.target.value;
+                  setFormData({ ...formData, name: newName });
+                  if (user && newName !== user.name) {
+                    debouncedUpdateName(newName);
+                  }
+                }}
+                placeholder="Enter your name"
+              />
             </div>
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -698,6 +777,29 @@ export default function ReportPage() {
                   {validationErrors.reportingOffice}
                 </p>
               )}
+              {/* Mayor input */}
+              <label className="block text-sm font-medium text-gray-700 mb-1 mt-4">
+                <span className="flex items-center gap-2">
+                  {/* Government/office icon for Mayor */}
+                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 21v-2a4 4 0 014-4h10a4 4 0 014 4v2M16 7a4 4 0 01-8 0m8 0V5a4 4 0 00-8 0v2m8 0a4 4 0 01-8 0" />
+                  </svg>
+                  Municipal Mayor
+                </span>
+              </label>
+              <input
+                type="text"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                value={formData.mayor}
+                onChange={e => {
+                  const newMayor = e.target.value;
+                  setFormData({ ...formData, mayor: newMayor });
+                  if (user && newMayor !== user.municipal_mayor) {
+                    debouncedUpdateMayor(newMayor);
+                  }
+                }}
+                placeholder="Enter municipal mayor"
+              />
             </div>
           </div>
         </div>
@@ -753,34 +855,57 @@ export default function ReportPage() {
                     </svg>
                     Navigate to Indicators
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowQuickAddModal(true)}
-                    className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                  >
-                    12 Available Jobs
-                  </button>
                 </div>
 
                 {/* Program Navigation Links */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {programOptions.map((program) => (
-                    <button
-                      key={program.value}
-                      type="button"
-                      onClick={() => {
-                        const element = document.getElementById(`program-${program.value}`);
-                        if (element) {
-                          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }
-                      }}
-                      className="flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
-                    >
-                      <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 mr-2 font-semibold">
-                        {program.label.split('.')[0]}
-                      </span>
-                      <span className="truncate">{program.label.split('.')[1]}</span>
-                    </button>
+                  {programOptions.map((program, idx) => (
+                    <React.Fragment key={program.value}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const element = document.getElementById(`program-${program.value}`);
+                          if (element) {
+                            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }
+                        }}
+                        className="flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+                      >
+                        <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 mr-2 font-semibold">
+                          {program.label.split('.')[0]}
+                        </span>
+                        <span className="truncate">{program.label.split('.')[1]}</span>
+                      </button>
+                      {/* After 11th (Livelihood and Self-Employed), insert modal buttons */}
+                      {idx === 10 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setShowAvailableJobs(true)}
+                            className="flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+                          >
+                            <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 mr-2 font-semibold">12</span>
+                            <span className="truncate">Available Jobs</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowGenderDistribution(true)}
+                            className="flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+                          >
+                            <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 mr-2 font-semibold">13</span>
+                            <span className="truncate">Gender Distribution</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowEmploymentSectors(true)}
+                            className="flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+                          >
+                            <span className="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 mr-2 font-semibold">14</span>
+                            <span className="truncate">Employment Sectors</span>
+                          </button>
+                        </>
+                      )}
+                    </React.Fragment>
                   ))}
                 </div>
                 {/* Quick Add Data Summary */}
@@ -1292,7 +1417,7 @@ export default function ReportPage() {
                   <button
                     onClick={() => {
                       setSubmitSuccess(false);
-                      resetForm();
+                      setFormData(initialFormState);
                     }}
                     className="text-sm font-medium text-gray-600 hover:text-gray-500 transition-colors"
                   >
@@ -1318,6 +1443,26 @@ export default function ReportPage() {
             </div>
           </div>
         )}
+
+        {/* Modals for 12, 13, 14 */}
+        <AvailableJobsModal
+          open={showAvailableJobs}
+          onClose={() => setShowAvailableJobs(false)}
+          onSave={setAvailableJobs}
+          initialJobs={availableJobs}
+        />
+        <GenderDistributionModal
+          open={showGenderDistribution}
+          onClose={() => setShowGenderDistribution(false)}
+          onSave={setGenderDistribution}
+          initialData={genderDistribution}
+        />
+        <EmploymentSectorsModal
+          open={showEmploymentSectors}
+          onClose={() => setShowEmploymentSectors(false)}
+          onSave={setEmploymentSectors}
+          initialData={employmentSectors}
+        />
 
         {/* Animations */}
         <style jsx>{`
