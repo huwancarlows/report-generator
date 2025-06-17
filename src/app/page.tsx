@@ -1,8 +1,25 @@
 'use client';
 import Image from "next/image";
 import Link from "next/link";
+import { useAuth } from "./context/AuthContext";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Home() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  // Add redirect for logged-in users
+  useEffect(() => {
+    if (user && !loading) {
+      if (user.role === "admin") {
+        router.replace("/admin");
+      } else {
+        router.replace("/dashboard");
+      }
+    }
+  }, [user, loading, router]);
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 via-white to-purple-100 dark:from-[#0a0a0a] dark:via-[#181c2a] dark:to-[#1a1a2a] text-black dark:text-white relative overflow-x-hidden">
       {/* Animated Gradient Background Blobs */}
@@ -42,7 +59,7 @@ export default function Home() {
             <h2 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Quick Access</h2>
             <div className="flex flex-col sm:flex-row gap-5">
               <Link
-                href="/login"
+                href="/login?type=peso"
                 className="group flex-1 flex flex-col items-center justify-center gap-3 px-8 py-7 bg-white/80 dark:bg-blue-950/80 rounded-2xl shadow-xl border border-blue-100 dark:border-blue-900 hover:scale-[1.03] hover:shadow-blue-200/40 dark:hover:shadow-blue-900/40 transition-all duration-200 ease-in-out cursor-pointer backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-blue-400 animate-fade-in"
               >
                 <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 mb-1">
@@ -50,20 +67,20 @@ export default function Home() {
                     <path fillRule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 </div>
-                <span className="text-base font-semibold text-blue-800 dark:text-blue-200">Login to System</span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 text-center">Sign in to access your dashboard and manage reports</span>
+                <span className="text-base font-semibold text-blue-800 dark:text-blue-200">Login as PESO</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 text-center">Sign in as PESO staff to access your dashboard and manage reports</span>
               </Link>
               <Link
-                href="/report"
-                className="group flex-1 flex flex-col items-center justify-center gap-3 px-8 py-7 bg-white/80 dark:bg-green-950/80 rounded-2xl shadow-xl border border-green-100 dark:border-green-900 hover:scale-[1.03] hover:shadow-green-200/40 dark:hover:shadow-green-900/40 transition-all duration-200 ease-in-out cursor-pointer backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-green-400 animate-fade-in"
+                href="/login?type=ble"
+                className="group flex-1 flex flex-col items-center justify-center gap-3 px-8 py-7 bg-white/80 dark:bg-purple-950/80 rounded-2xl shadow-xl border border-purple-100 dark:border-purple-900 hover:scale-[1.03] hover:shadow-purple-200/40 dark:hover:shadow-purple-900/40 transition-all duration-200 ease-in-out cursor-pointer backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-purple-400 animate-fade-in"
               >
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 mb-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-green-700 dark:text-green-300" viewBox="0 0 20 20" fill="currentColor">
+                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 mb-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-purple-700 dark:text-purple-300" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586L7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
                   </svg>
                 </div>
-                <span className="text-base font-semibold text-green-800 dark:text-green-200">Create Report</span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 text-center">Start a new employment report in the official format</span>
+                <span className="text-base font-semibold text-purple-800 dark:text-purple-200">Login as BLE</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 text-center">Sign in as BLE administrator to access admin dashboard</span>
               </Link>
             </div>
           </section>

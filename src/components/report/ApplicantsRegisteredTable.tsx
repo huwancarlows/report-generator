@@ -38,7 +38,7 @@ export default function ApplicantsRegisteredTable({ reportData, selectedReportIn
                 (
                     !subIndicator || entry.sub_indicator === subIndicator || (entry.sub_indicator === null && subIndicator === '') || (entry.sub_indicator === '' && subIndicator === null)
                 ) &&
-                entry.sub_sub_indicator === 'FEMALE'
+                entry.sub_sub_indicator && entry.sub_sub_indicator.includes('FEMALE')
             )
             .reduce((sum, entry) => sum + (entry[period] || 0), 0);
     };
@@ -66,17 +66,17 @@ export default function ApplicantsRegisteredTable({ reportData, selectedReportIn
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900 text-center w-[12%]">
                             <div className="space-y-2">
-                                <div>{getEntryValue('REGULAR_PROGRAM', null, null, 'previous_report_period')}</div>
+                                <div>{getEntryValue('REGULAR_PROGRAM_2', null, null, 'previous_report_period')}</div>
                                 <div className="text-pink-600">
-                                    {getFemaleCount('REGULAR_PROGRAM', null, 'previous_female_count')}
+                                    {getFemaleCount('REGULAR_PROGRAM_2', null, 'previous_female_count')}
                                 </div>
                             </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900 text-center w-[12%]">
                             <div className="space-y-2">
-                                <div>{getEntryValue('REGULAR_PROGRAM', null, null, 'current_period')}</div>
+                                <div>{getEntryValue('REGULAR_PROGRAM_2', null, null, 'current_period')}</div>
                                 <div className="text-pink-600">
-                                    {getFemaleCount('REGULAR_PROGRAM', null, 'current_female_count')}
+                                    {getFemaleCount('REGULAR_PROGRAM_2', null, 'current_female_count')}
                                 </div>
                             </div>
                         </td>
@@ -94,17 +94,17 @@ export default function ApplicantsRegisteredTable({ reportData, selectedReportIn
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900 text-center w-[12%]">
                             <div className="space-y-2">
-                                <div>{getEntryValue('SPES', null, null, 'previous_report_period')}</div>
+                                <div>{getEntryValue('SPES_2', null, null, 'previous_report_period')}</div>
                                 <div className="text-pink-600">
-                                    {getFemaleCount('SPES', null, 'previous_female_count')}
+                                    {getFemaleCount('SPES_2', null, 'previous_female_count')}
                                 </div>
                             </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900 text-center w-[12%]">
                             <div className="space-y-2">
-                                <div>{getEntryValue('SPES', null, null, 'current_period')}</div>
+                                <div>{getEntryValue('SPES_2', null, null, 'current_period')}</div>
                                 <div className="text-pink-600">
-                                    {getFemaleCount('SPES', null, 'current_female_count')}
+                                    {getFemaleCount('SPES_2', null, 'current_female_count')}
                                 </div>
                             </div>
                         </td>
@@ -122,17 +122,17 @@ export default function ApplicantsRegisteredTable({ reportData, selectedReportIn
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900 text-center w-[12%]">
                             <div className="space-y-2">
-                                <div>{getEntryValue('WAP', null, null, 'previous_report_period')}</div>
+                                <div>{getEntryValue('WAP_2', null, null, 'previous_report_period')}</div>
                                 <div className="text-pink-600">
-                                    {getFemaleCount('WAP', null, 'previous_female_count')}
+                                    {getFemaleCount('WAP_2', null, 'previous_female_count')}
                                 </div>
                             </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900 text-center w-[12%]">
                             <div className="space-y-2">
-                                <div>{getEntryValue('WAP', null, null, 'current_period')}</div>
+                                <div>{getEntryValue('WAP_2', null, null, 'current_period')}</div>
                                 <div className="text-pink-600">
-                                    {getFemaleCount('WAP', null, 'current_female_count')}
+                                    {getFemaleCount('WAP_2', null, 'current_female_count')}
                                 </div>
                             </div>
                         </td>
@@ -145,22 +145,20 @@ export default function ApplicantsRegisteredTable({ reportData, selectedReportIn
                         <td className="px-6 py-4 text-sm text-gray-900 w-[35%]">
                             <div className="space-y-2">
                                 <div>2.4.1 Wage employment</div>
-                                <div className="ml-4">2.4.1.1 Total</div>
-                                <div className="ml-8">2.4.1.1.1 Female</div>
+                                <div className="ml-4">2.4.1.1 Female</div>
                                 <div>2.4.2 Self-employment</div>
-                                <div className="ml-4">2.4.2.1 Total</div>
-                                <div className="ml-8">2.4.2.1.1 Female</div>
+                                <div className="ml-4">2.4.2.1 Female</div>
                             </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900 text-center w-[12%]">
                             <div className="space-y-2">
-                                {['WAGE_EMPLOYMENT', 'SELF_EMPLOYMENT'].map((type) => (
+                                {['WAGE_EMPLOYMENT_2', 'SELF_EMPLOYMENT_2'].map((type) => (
                                     <div key={type}>
                                         <div>
-                                            {getEntryValue('TULAY', type, null, 'previous_report_period')}
+                                            {getEntryValue('TULAY_2', type, null, 'previous_report_period')}
                                         </div>
                                         <div className="text-pink-600">
-                                            {getFemaleCount('TULAY', type, 'previous_female_count')}
+                                            {getFemaleCount('TULAY_2', type, 'previous_female_count')}
                                         </div>
                                     </div>
                                 ))}
@@ -168,13 +166,13 @@ export default function ApplicantsRegisteredTable({ reportData, selectedReportIn
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900 text-center w-[12%]">
                             <div className="space-y-2">
-                                {['WAGE_EMPLOYMENT', 'SELF_EMPLOYMENT'].map((type) => (
+                                {['WAGE_EMPLOYMENT_2', 'SELF_EMPLOYMENT_2'].map((type) => (
                                     <div key={type}>
                                         <div>
-                                            {getEntryValue('TULAY', type, null, 'current_period')}
+                                            {getEntryValue('TULAY_2', type, null, 'current_period')}
                                         </div>
                                         <div className="text-pink-600">
-                                            {getFemaleCount('TULAY', type, 'current_female_count')}
+                                            {getFemaleCount('TULAY_2', type, 'current_female_count')}
                                         </div>
                                     </div>
                                 ))}
@@ -183,13 +181,13 @@ export default function ApplicantsRegisteredTable({ reportData, selectedReportIn
                     </tr>
 
                     {/* Special Categories */}
-                    {['RETRENCHED', 'OFWS', 'MIGRATORY', 'RURAL'].map((category, index) => (
+                    {['RETRENCHED_2', 'OFWS_2', 'MIGRATORY_2', 'RURAL_2'].map((category, index) => (
                         <tr key={category}>
                             <td className="px-6 py-4 text-sm text-gray-900 w-[8%]"></td>
                             <td className="px-6 py-4 text-sm text-gray-900 w-[20%]">
-                                {`2.${index + 5} ${category === 'RETRENCHED' ? 'Retrenched/Displaced Workers' :
-                                    category === 'OFWS' ? 'Returning OFWs' :
-                                        category === 'MIGRATORY' ? 'Migratory Workers' :
+                                {`2.${index + 5} ${category === 'RETRENCHED_2' ? 'Retrenched/Displaced Workers' :
+                                    category === 'OFWS_2' ? 'Returning OFWs' :
+                                        category === 'MIGRATORY_2' ? 'Migratory Workers' :
                                             'Rural Workers'}`}
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-900 w-[35%]">
@@ -229,7 +227,7 @@ export default function ApplicantsRegisteredTable({ reportData, selectedReportIn
                             </div>
                             <div className="text-pink-600">
                                 {entries
-                                    .filter(entry => entry.sub_sub_indicator === 'FEMALE')
+                                    .filter(entry => entry.sub_sub_indicator && entry.sub_sub_indicator.includes('FEMALE'))
                                     .reduce((sum, entry) => sum + (entry.previous_female_count || 0), 0)}
                             </div>
                         </td>
@@ -241,7 +239,7 @@ export default function ApplicantsRegisteredTable({ reportData, selectedReportIn
                             </div>
                             <div className="text-pink-600">
                                 {entries
-                                    .filter(entry => entry.sub_sub_indicator === 'FEMALE')
+                                    .filter(entry => entry.sub_sub_indicator && entry.sub_sub_indicator.includes('FEMALE'))
                                     .reduce((sum, entry) => sum + (entry.current_female_count || 0), 0)}
                             </div>
                         </td>

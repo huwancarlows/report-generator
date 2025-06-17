@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,6 +17,13 @@ export default function LoginPage() {
   const [isBLE, setIsBLE] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [loginAttempted, setLoginAttempted] = useState(false);
+
+  // Set login type from query param on mount
+  useEffect(() => {
+    const type = searchParams.get('type');
+    if (type === 'ble') setIsBLE(true);
+    else setIsBLE(false);
+  }, [searchParams]);
 
   // Track login success and redirect after user is set
   useEffect(() => {
@@ -44,6 +52,16 @@ export default function LoginPage() {
       return () => clearTimeout(timeout);
     }
   }, [showSuccess, user, authLoading, isBLE, router, loginAttempted]);
+
+  useEffect(() => {
+    if (user && !authLoading && !showSuccess) {
+      if (user.role === "admin") {
+        router.replace("/admin");
+      } else {
+        router.replace("/dashboard");
+      }
+    }
+  }, [user, authLoading, showSuccess, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,21 +108,21 @@ export default function LoginPage() {
 
   return (
     <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${isBLE
-      ? 'from-purple-50 via-indigo-50 to-blue-50'
-      : 'from-blue-50 via-indigo-50 to-purple-50'
-      } relative overflow-hidden`}>
+      ? 'from-purple-50 via-indigo-50 to-blue-50 dark:from-purple-950 dark:via-indigo-950 dark:to-blue-950'
+      : 'from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950 dark:via-indigo-950 dark:to-purple-950'
+      } text-black dark:text-blue-100 relative overflow-hidden`}>
       {/* Background Pattern */}
-      <div className="absolute inset-0 z-0 opacity-40 bg-grid-pattern pointer-events-none"></div>
+      <div className="absolute inset-0 z-0 opacity-40 bg-grid-pattern pointer-events-none dark:opacity-20"></div>
 
       <div className="w-full max-w-3xl mx-auto px-4 relative z-10">
         {/* Login Type Toggle */}
         <div className="flex justify-center mb-8">
-          <div className="bg-white/90 backdrop-blur-sm p-1.5 rounded-full shadow-lg border border-gray-200 flex gap-2">
+          <div className="bg-white/90 dark:bg-[#232b3e]/90 backdrop-blur-sm p-1.5 rounded-full shadow-lg border border-gray-200 dark:border-blue-900 flex gap-2">
             <button
               onClick={() => { if (isBLE) toggleLoginType(); }}
-              className={`px-8 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400 ${!isBLE
-                ? 'bg-blue-600 text-white shadow-md scale-105'
-                : 'text-gray-600 hover:text-blue-700 hover:bg-blue-50'}
+              className={`px-8 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-900 ${!isBLE
+                ? 'bg-blue-600 text-white shadow-md scale-105 dark:bg-blue-800'
+                : 'text-gray-600 dark:text-blue-100 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/40'}
                 `}
               style={{ minWidth: 90 }}
             >
@@ -112,9 +130,9 @@ export default function LoginPage() {
             </button>
             <button
               onClick={() => { if (!isBLE) toggleLoginType(); }}
-              className={`px-8 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-400 ${isBLE
-                ? 'bg-purple-600 text-white shadow-md scale-105'
-                : 'text-gray-600 hover:text-purple-700 hover:bg-purple-50'}
+              className={`px-8 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-400 dark:focus:ring-purple-900 ${isBLE
+                ? 'bg-purple-600 text-white shadow-md scale-105 dark:bg-purple-800'
+                : 'text-gray-600 dark:text-purple-100 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/40'}
                 `}
               style={{ minWidth: 90 }}
             >
@@ -124,11 +142,11 @@ export default function LoginPage() {
         </div>
 
         {/* Card Layout */}
-        <div className="bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-200 flex flex-col md:flex-row overflow-hidden hover:shadow-blue-200/40 transition-shadow duration-300">
+        <div className="bg-white/95 dark:bg-[#181c2a]/95 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-blue-900 flex flex-col md:flex-row overflow-hidden hover:shadow-blue-200/40 dark:hover:shadow-blue-900/40 transition-shadow duration-300">
           {/* Logo/Brand Section */}
-          <div className="flex flex-col items-center justify-center md:items-center md:justify-center md:w-1/2 p-10 bg-gradient-to-br from-white/90 to-blue-50 dark:from-gray-100/80 dark:to-gray-200 relative">
+          <div className="flex flex-col items-center justify-center md:items-center md:justify-center md:w-1/2 p-10 bg-gradient-to-br from-white/90 to-blue-50 dark:from-[#232b3e]/90 dark:to-blue-900/40 relative">
             <div className="flex flex-col items-center w-full">
-              <div className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg bg-white border border-gray-200 mb-4">
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg bg-white dark:bg-[#181c2a] border border-gray-200 dark:border-blue-900 mb-4">
                 <Image
                   src={isBLE ? '/images/dole-logo.png' : '/images/peso-logo.png'}
                   alt={isBLE ? 'DOLE Logo' : 'PESO Logo'}
@@ -137,49 +155,49 @@ export default function LoginPage() {
                   className="object-contain"
                 />
               </div>
-              <h1 className={`text-3xl font-extrabold ${isBLE ? 'text-purple-700' : 'text-blue-700'} mb-1 tracking-tight`}>{isBLE ? 'BLE' : 'PESO'}</h1>
-              <p className="text-base text-gray-700 font-medium">
+              <h1 className={`text-3xl font-extrabold ${isBLE ? 'text-purple-700 dark:text-purple-300' : 'text-blue-700 dark:text-blue-300'} mb-1 tracking-tight`}>{isBLE ? 'BLE' : 'PESO'}</h1>
+              <p className="text-base text-gray-700 dark:text-blue-100 font-medium">
                 {isBLE ? 'Bureau of Local Employment' : 'Public Employment Service Office'}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {isBLE ? 'Administrator Access Only' : 'PESO Staff Access Only'}
               </p>
             </div>
             {/* Divider for desktop */}
-            <div className="hidden md:block absolute top-8 right-0 h-[80%] w-px bg-gradient-to-b from-gray-200/80 to-gray-100/0" />
+            <div className="hidden md:block absolute top-8 right-0 h-[80%] w-px bg-gradient-to-b from-gray-200/80 to-gray-100/0 dark:from-blue-900/60 dark:to-blue-900/0" />
           </div>
 
           {/* Login Form Section */}
-          <div className="flex-1 flex flex-col justify-center p-8 md:p-12">
-            <h2 className="text-2xl font-extrabold text-gray-900 mb-2 text-left tracking-tight">
+          <div className="flex-1 flex flex-col justify-center p-8 md:p-12 bg-white dark:bg-[#181c2a]">
+            <h2 className="text-2xl font-extrabold text-gray-900 dark:text-blue-100 mb-2 text-left tracking-tight">
               Welcome
             </h2>
-            <p className="text-sm text-gray-500 mb-8 text-left">
+            <p className="text-sm text-gray-500 dark:text-gray-300 mb-8 text-left">
               Sign in to access your {isBLE ? 'admin dashboard' : 'PESO dashboard'}
             </p>
             {/* Error Alert */}
             {error && (
-              <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 flex items-center animate-shake shadow-sm">
+              <div className="mb-6 p-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-400 flex items-center animate-shake shadow-sm">
                 <div className="flex-shrink-0">
-                  <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-red-500 dark:text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm font-semibold text-red-800">Login failed</p>
-                  <p className="text-sm text-red-600">{error}</p>
+                  <p className="text-sm font-semibold text-red-800 dark:text-red-200">Login failed</p>
+                  <p className="text-sm text-red-600 dark:text-red-100">{error}</p>
                 </div>
               </div>
             )}
 
             <form onSubmit={handleLogin} className="space-y-6">
               <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-blue-100">
                   Email Address
                 </label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400 group-hover:text-gray-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-5 w-5 text-gray-400 dark:text-gray-300 group-hover:text-gray-500 dark:group-hover:text-blue-100 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                     </svg>
                   </div>
@@ -187,7 +205,7 @@ export default function LoginPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm transition-all duration-200 placeholder-gray-400 hover:border-blue-400"
+                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 dark:border-blue-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-900 focus:border-blue-500 dark:focus:border-blue-900 bg-white dark:bg-[#232b3e] text-gray-900 dark:text-blue-100 text-sm transition-all duration-200 placeholder-gray-400 dark:placeholder-blue-200 hover:border-blue-400 dark:hover:border-blue-300"
                     placeholder="Enter your email"
                     required
                   />
@@ -195,12 +213,12 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-blue-100">
                   Password
                 </label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400 group-hover:text-gray-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-5 w-5 text-gray-400 dark:text-gray-300 group-hover:text-gray-500 dark:group-hover:text-blue-100 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                   </div>
@@ -208,14 +226,14 @@ export default function LoginPage() {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-12 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 text-sm transition-all duration-200 placeholder-gray-400 hover:border-blue-400"
+                    className="w-full pl-10 pr-12 py-3 rounded-lg border border-gray-300 dark:border-blue-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-900 focus:border-blue-500 dark:focus:border-blue-900 bg-white dark:bg-[#232b3e] text-gray-900 dark:text-blue-100 text-sm transition-all duration-200 placeholder-gray-400 dark:placeholder-blue-200 hover:border-blue-400 dark:hover:border-blue-300"
                     placeholder="Enter your password"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-blue-200 hover:text-gray-600 dark:hover:text-blue-100 transition-colors focus:outline-none"
                   >
                     {showPassword ? (
                       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -235,8 +253,8 @@ export default function LoginPage() {
                 type="submit"
                 disabled={loading || authLoading}
                 className={`w-full py-3 px-4 ${isBLE
-                  ? 'bg-purple-600 hover:bg-purple-700 focus:ring-purple-500'
-                  : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                  ? 'bg-purple-600 hover:bg-purple-700 focus:ring-purple-500 dark:bg-purple-800 dark:hover:bg-purple-900 dark:focus:ring-purple-900'
+                  : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 dark:bg-blue-800 dark:hover:bg-blue-900 dark:focus:ring-blue-900'
                   } text-white font-semibold rounded-lg transition-all duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5`}
               >
                 {loading ? (
@@ -256,7 +274,7 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <div className="mt-8 text-center text-gray-500 text-xs">
+        <div className="mt-8 text-center text-gray-500 dark:text-gray-400 text-xs">
           <p className="font-medium">Department of Labor and Employment</p>
           <p className="mt-1">© {new Date().getFullYear()} {isBLE ? 'BLE' : 'PESO'}. All rights reserved.</p>
         </div>

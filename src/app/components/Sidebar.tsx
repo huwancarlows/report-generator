@@ -176,7 +176,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.12)',
         }}
       >
-        <div className={`h-full flex flex-col px-2 py-4 overflow-y-hidden scrollbar-none scrollbar-thumb-gray-800 ${isOpen ? '' : 'items-center justify-center px-0 py-0'}`}>
+        <div className={`h-full flex flex-col px-2 py-4 ${isOpen ? 'overflow-y-auto' : 'overflow-hidden'} scrollbar-none scrollbar-thumb-gray-800 ${isOpen ? '' : 'items-center justify-center px-0 py-0'}`}>
           {/* Logo Section */}
           <div className={`flex flex-col items-center justify-center ${isOpen ? 'mb-10 mt-12 px-2' : 'mb-4 mt-4 px-0'} w-full`} style={{ minHeight: isOpen ? 'auto' : '72px' }}>
             <div className="flex flex-col items-center w-full">
